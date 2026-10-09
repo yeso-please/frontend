@@ -1,0 +1,50 @@
+import Svg, { Path } from "react-native-svg";
+
+// 피그마 SVG(icon-people, icon-pin-16)는 색이 파일에 박혀 있어 상태별 색을 바꿀 수 없습니다.
+// 같은 path를 color prop으로 칠할 수 있게 옮긴 것입니다 (Task Card Current = blue, 지역 태그 = darkgreen).
+
+type Props = { color: string; size?: number };
+
+/** icon-people.svg (22) */
+export function PeopleIcon({ color, size = 22 }: Props) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 22 22" fill="none">
+      <Path
+        d="M8.25 10.0833C9.76878 10.0833 11 8.85212 11 7.33333C11 5.81455 9.76878 4.58333 8.25 4.58333C6.73122 4.58333 5.5 5.81455 5.5 7.33333C5.5 8.85212 6.73122 10.0833 8.25 10.0833Z"
+        stroke={color}
+        strokeWidth={1.55833}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M2.75 19.25V17.4167C2.75 15.958 3.32946 14.559 4.36091 13.5276C5.39236 12.4961 6.79131 11.9167 8.25 11.9167C9.70869 11.9167 11.1076 12.4961 12.1391 13.5276C13.1705 14.559 13.75 15.958 13.75 17.4167V19.25M14.6667 4.58333C15.396 4.58333 16.0955 4.87306 16.6112 5.38879C17.1269 5.90451 17.4167 6.60399 17.4167 7.33333C17.4167 8.06268 17.1269 8.76215 16.6112 9.27788C16.0955 9.7936 15.396 10.0833 14.6667 10.0833M15.5833 13.75C16.6342 13.9643 17.5766 14.5403 18.2466 15.3777C18.9165 16.2152 19.2716 17.2611 19.25 18.3333"
+        stroke={color}
+        strokeWidth={1.55833}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+/** icon-pin-16.svg (16) */
+export function PinIcon({ color, size = 16 }: Props) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 16 16" fill="none">
+      <Path
+        d="M13.3333 6.66667C13.3333 10.6667 8 14 8 14C8 14 2.66667 10.6667 2.66667 6.66667C2.66667 5.25218 3.22857 3.89562 4.22876 2.89543C5.22896 1.89524 6.58551 1.33333 8 1.33333C9.41449 1.33333 10.771 1.89524 11.7712 2.89543C12.7714 3.89562 13.3333 5.25218 13.3333 6.66667Z"
+        stroke={color}
+        strokeWidth={1.13333}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path
+        d="M8 8.66667C9.10457 8.66667 10 7.77124 10 6.66667C10 5.5621 9.10457 4.66667 8 4.66667C6.89543 4.66667 6 5.5621 6 6.66667C6 7.77124 6.89543 8.66667 8 8.66667Z"
+        stroke={color}
+        strokeWidth={1.13333}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
