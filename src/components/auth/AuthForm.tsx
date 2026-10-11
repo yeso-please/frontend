@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type Ref } from "react";
 import { KeyboardAvoidingView, ScrollView, StyleSheet, TextInput, View, type TextInputProps } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 
@@ -30,9 +30,10 @@ export function AuthLayout({ title, subtitle, children, footer }: { title: strin
   );
 }
 
-type FieldProps = TextInputProps & { label: string; error?: string };
+type FieldProps = TextInputProps & { label: string; error?: string; ref?: Ref<TextInput> };
 
-export function Field({ label, error, style, ...rest }: FieldProps) {
+/** 입력칸. returnKeyType="next" + onSubmitEditing으로 다음 칸에 포커스를 넘기면 키보드가 열린 채로 이어서 입력할 수 있습니다. */
+export function Field({ label, error, style, ref, ...rest }: FieldProps) {
   const [focused, setFocused] = useState(false);
   return (
     <View style={styles.field}>
@@ -40,6 +41,7 @@ export function Field({ label, error, style, ...rest }: FieldProps) {
         {label}
       </AppText>
       <TextInput
+        ref={ref}
         {...rest}
         onFocus={(e) => {
           setFocused(true);
@@ -74,6 +76,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     paddingHorizontal: 16,
+    // Android 입력창 기본 세로 여백 + Noto Sans KR 글꼴 여백 때문에 글자가 잘리지 않게 합니다
+    paddingVertical: 0,
+    includeFontPadding: false,
+    textAlignVertical: "center",
     fontFamily: fonts.regular,
     fontSize: 15,
     color: colors.charcoal,

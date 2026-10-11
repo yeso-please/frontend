@@ -27,6 +27,8 @@ import type {
 export const authApi = {
   signup: (body: { email: string; password: string; nickname: string }) => api.post<AuthResponse>("/auth/signup", body, { auth: false }),
   login: (body: { email: string; password: string }) => api.post<AuthResponse>("/auth/login", body, { auth: false }),
+  /** 카카오 인가 코드로 가입·로그인 (redirectUri는 인가 요청에 쓴 값과 같아야 합니다) */
+  kakao: (body: { code: string; redirectUri: string }) => api.post<AuthResponse>("/auth/kakao", body, { auth: false }),
   logout: () => api.post<void>("/auth/logout", undefined, { auth: false }),
   me: () => api.get<Me>("/users/me"),
 };
