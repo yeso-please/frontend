@@ -6,10 +6,15 @@ export const MAP_IMAGE = { width: 984, height: 1230 } as const;
 const NX = [0.183633, 0.009198, -23.280122] as const;
 const NY = [0.029133, -0.164039, 2.665922] as const;
 
-/** 위경도 → 지도 이미지 기준 0~1 좌표 */
+// 그림에 실제로 땅이 그려진 범위(투명하지 않은 영역, 0~1). 옹진군(서해 섬)·울릉군처럼 그림 밖으로
+// 계산되는 지역은 이 범위 가장자리로 붙여 핀이 지도 밖에 떨어지지 않게 합니다.
+const LAND = { minX: 0.09, maxX: 0.93, minY: 0.04, maxY: 0.95 } as const;
+const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
+
+/** 위경도 → 지도 이미지 기준 0~1 좌표 (그림 범위 안으로 보정) */
 export function projectToMap(lat: number, lng: number) {
   return {
-    x: NX[0] * lng + NX[1] * lat + NX[2],
-    y: NY[0] * lng + NY[1] * lat + NY[2],
+    x: clamp(NX[0] * lng + NX[1] * lat + NX[2], LAND.minX, LAND.maxX),
+    y: clamp(NY[0] * lng + NY[1] * lat + NY[2], LAND.minY, LAND.maxY),
   };
 }
