@@ -6,18 +6,19 @@ React Native(Expo SDK 57, RN 0.86, New Architecture) Android 앱입니다. API �
 
 피그마 "디자인 (초안)"에 있는 화면까지만 만듭니다. 디자인이 없는 화면(여행 탭 목록, 저장 탭, 로그인·회원가입, 코스 화면)은 토큰만 맞춘 기본 화면이나 자리만 둡니다.
 
-## 흐름 (2026-10-09 결정)
+## 흐름 (2026-10-09 결정, 10-11 온보딩 v2 반영)
 
 ```text
-로그인/회원가입 ─→ 온보딩(AI Hub 설문: 여행 스타일 → 여행 동기 → 좋아하는 지역 → 여행 방식) ─→ 분석 중 ─→ 홈 탭
+로그인/회원가입/카카오 ─→ 온보딩(여행 스타일 → 여행 동기 → 좋아하는 지역 → 여행 방식 → 여행 MBTI 12문항) ─→ 분석 중 ─→ MBTI 결과 ─→ 홈 탭
 홈: 랜덤 핀 꽂기 → 핀 떨어지는 중 → 여행지 발견(시트) ⇄ 자세히(시트 펼침) → "OO으로 여행 만들기"
   → 여행 준비(A) → 날짜 선택(C, POST /trips + POST /trips/{id}/region MANUAL) → 친구 초대(D) → 여행(코스 화면, 미디자인)
-MY 탭: 여행 MBTI 검사(S1 질문 12개 → S2 경험 태그·제외 조건 → S3 분석 → B 결과). 앱 안에서만 계산하고 서버에 보내지 않습니다.
+MY 탭: 나의 여행 성향(서버 mbtiCode), 여행 취향 다시 설정(온보딩 재검사), 로그아웃
 ```
 
 - **핀 먼저:** 홈에서 앱이 `GET /regions?days=1`의 추첨 가능 지역 중 하나를 고릅니다. 여행을 만든 뒤 `POST /trips/{id}/region`에 `mode: "MANUAL"`로 저장합니다. 고른 지역이 감당 못 하는 긴 일정은 날짜 화면에서 막습니다(`GET /regions?days=N`).
-- **온보딩:** 백엔드 `aihub-traveler-v1` 설문입니다. 피그마 402px 온보딩(성별 제외)을 디자인 토큰으로 맞춰 구현합니다. 성별은 서버 필드가 없어 받지 않습니다.
-- **MBTI:** 디자이너 메모 "MY → mbti 검사". 구형 `demo-mbti-v1`으로 제출하면 최신 온보딩을 덮어쓰므로 **절대 서버에 제출하지 않습니다.**
+- **온보딩:** 백엔드 `aihub-traveler-v2` 설문입니다. 피그마 402px 온보딩(성별 제외)을 디자인 토큰으로 맞춰 구현했고, 그 뒤에 피그마 S1 화면으로 여행 MBTI 12문항(`mbtiQuestions`)을 묻습니다. 성별은 서버 필드가 없어 받지 않습니다.
+- **MBTI:** 서버가 `mbtiAnswers`로 `mbtiCode`를 계산합니다(표시용, 추천에는 안 씀). 선택지 → 글자 매핑은 서버만 알며 앱은 결과만 보여 줍니다. 제출 응답에 `excludeTags`·`mbtiAnswers`가 없어 다시 설정할 때 MBTI는 새로 답합니다.
+- **카카오 로그인:** 백엔드는 웹 리다이렉트 방식(`POST /auth/kakao {code, redirectUri}`)만 지원합니다. 앱은 카카오 인가 페이지를 웹뷰로 열고, 등록된 redirect URI(`EXPO_PUBLIC_KAKAO_REDIRECT_URI`, 백엔드 허용 목록과 같아야 함)로 이동하는 순간 `code`를 가로채 서버에 보냅니다. `state`로 CSRF를 막습니다. 키가 비어 있으면 버튼을 숨기고, 목업 모드에서는 웹뷰 없이 바로 카카오 회원으로 로그인합니다.
 
 ## 폴더
 
@@ -28,12 +29,14 @@ src/
     onboarding/        취향 온보딩
     (tabs)/            홈·여행·저장·MY 탭
     trip/              여행 준비 흐름 (prepare, dates, [tripId]/invite, [tripId])
-    my/mbti/           여행 MBTI 검사
+    my/               여행 MBTI 결과(mbti/result), 취향 다시 설정(taste)
+    (auth)/kakao       카카오 로그인 웹뷰
   api/                 client(토큰 재발급 single-flight), endpoints, types, queryKeys, mock(목업 서버)
   components/ui/       공통 UI (AppText, Button, PressableScale, TopBar, BottomCTA, ProgressBar, Chip, StateViews)
   components/icons.ts  피그마 SVG 아이콘
   features/<기능>/      기능별 컴포넌트·훅·데이터
   store/               zustand (auth, tripDraft)
+  features/auth/       카카오 로그인 도우미·버튼
   theme/               피그마 토큰 (colors, typography, layout, motion)
   lib/                 haptics, date, mapProjection
 assets/icons           피그마에서 내보낸 SVG
@@ -57,6 +60,19 @@ assets/illustrations   한국 지도(WebP), MBTI 캐릭터 16종
   - 새 API를 쓰면 목업에도 같은 모양으로 추가합니다.
 - **코드 스타일 (노션 컨벤션):** 쌍따옴표, 세미콜론, camelCase.
 - **커밋:** `feat: …`, `fix: …`, `docs: …`. 한 커밋에 한 가지 문제만 담습니다.
+
+## 테스트
+
+```bash
+npm run typecheck   # 앱 + 테스트 타입 검사
+npm run lint
+npm test            # Jest (tests/): 날짜·조사·지도 좌표, API 클라이언트 토큰 재발급, 목업 API 계약
+npx expo-doctor
+```
+
+## 폰트
+
+Noto Sans KR은 쓰는 굵기 3개(400/500/700)만, 한글 완성형·자모·영문·기호만 남긴 서브셋을 `assets/fonts`에 둡니다(OFL, 굵기당 약 2.7MB). `@expo-google-fonts/noto-sans-kr` 패키지 index를 import하면 9개 굵기(약 53MB)가 모두 앱에 들어가므로 쓰지 않습니다.
 
 ## 실행
 
