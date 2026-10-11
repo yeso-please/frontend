@@ -1,5 +1,4 @@
-import { KeaniaOne_400Regular } from "@expo-google-fonts/keania-one";
-import { NotoSansKR_400Regular, NotoSansKR_500Medium, NotoSansKR_700Bold, useFonts } from "@expo-google-fonts/noto-sans-kr";
+import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
@@ -14,7 +13,14 @@ SplashScreen.preventAutoHideAsync();
 SplashScreen.setOptions({ duration: 300, fade: true });
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({ NotoSansKR_400Regular, NotoSansKR_500Medium, NotoSansKR_700Bold, KeaniaOne_400Regular });
+  // Noto Sans KR은 쓰는 굵기 3개만, 한글 완성형·자모·영문·기호만 남긴 서브셋입니다 (assets/fonts, OFL).
+  // 구글 폰트 패키지를 통째로 불러오면 9개 굵기(약 53MB)가 모두 앱에 들어갑니다.
+  const [fontsLoaded] = useFonts({
+    NotoSansKR_400Regular: require("@/assets/fonts/NotoSansKR-Regular.ttf"),
+    NotoSansKR_500Medium: require("@/assets/fonts/NotoSansKR-Medium.ttf"),
+    NotoSansKR_700Bold: require("@/assets/fonts/NotoSansKR-Bold.ttf"),
+    KeaniaOne_400Regular: require("@/assets/fonts/KeaniaOne-Regular.ttf"),
+  });
   const status = useAuthStore((s) => s.status);
   const onboardingCompleted = useAuthStore((s) => s.onboardingCompleted);
 
