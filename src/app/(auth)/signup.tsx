@@ -1,6 +1,7 @@
 import { useMutation } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import type { TextInput } from "react-native";
 
 import { authApi } from "@/api/endpoints";
 import { ApiError, isApiError } from "@/api/errors";
@@ -14,6 +15,8 @@ export default function SignupScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const setSession = useAuthStore((s) => s.setSession);
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
 
   const signup = useMutation({
     mutationFn: () => authApi.signup({ email, password, nickname }),
@@ -42,8 +45,19 @@ export default function SignupScreen() {
         </BottomCTA>
       }
     >
-      <Field label="닉네임" value={nickname} onChangeText={setNickname} maxLength={30} placeholder="친구에게 보일 이름" error={fieldError("nickname")} />
       <Field
+        label="닉네임"
+        value={nickname}
+        onChangeText={setNickname}
+        maxLength={30}
+        placeholder="친구에게 보일 이름"
+        error={fieldError("nickname")}
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => emailRef.current?.focus()}
+      />
+      <Field
+        ref={emailRef}
         label="이메일"
         value={email}
         onChangeText={setEmail}
@@ -52,8 +66,12 @@ export default function SignupScreen() {
         autoComplete="email"
         placeholder="you@example.com"
         error={fieldError("email") ?? (isApiError(err, "AUTH_DUPLICATE_EMAIL") ? err.message : undefined)}
+        returnKeyType="next"
+        submitBehavior="submit"
+        onSubmitEditing={() => passwordRef.current?.focus()}
       />
       <Field
+        ref={passwordRef}
         label="비밀번호"
         value={password}
         onChangeText={setPassword}
@@ -62,6 +80,10 @@ export default function SignupScreen() {
         maxLength={64}
         placeholder="8~64자"
         error={fieldError("password")}
+        returnKeyType="go"
+        onSubmitEditing={() => {
+          if (nickname.trim() && email && password.length >= 8 && !signup.isPending) signup.mutate();
+        }}
       />
     </AuthLayout>
   );

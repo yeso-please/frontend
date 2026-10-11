@@ -186,6 +186,10 @@ const styles = StyleSheet.create({
     borderColor: colors.onboardingCardBorder,
     paddingLeft: space[16],
     paddingRight: sizes.touchTarget + 4,
+    // Android 입력창 기본 세로 여백 + Noto Sans KR 글꼴 여백 때문에 글자 윗부분이 잘리지 않게 합니다
+    paddingVertical: 0,
+    includeFontPadding: false,
+    textAlignVertical: "center",
     fontFamily: fonts.regular,
     fontSize: 15,
     color: colors.charcoal,
