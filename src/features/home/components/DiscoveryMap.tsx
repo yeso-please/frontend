@@ -11,8 +11,8 @@ import { type HomeGeometry, mapTransform, PIN, projectOnScreen, SHEET } from "..
 
 const KOREA_MAP = require("@/assets/illustrations/korea-map.webp");
 
-// 피그마 TriPin/Map pin 그림자: drop-shadow (1, 5) blur 5, rgba(8, 51, 26, 0.46). Android(RN 0.76+) filter로 그립니다.
-const PIN_SHADOW = "drop-shadow(1px 5px 2.5px rgba(8, 51, 26, 0.46))";
+// 피그마 TriPin/Map pin 그림자(drop-shadow 1·5, blur 5)는 그리지 않습니다. CSS filter는 움직이는 핀을 매 프레임
+// 오프스크린 버퍼에 다시 그려 GPU 메모리와 프레임 비용이 커서, 핀 아래 바닥 그림자(ground)·글로우로 대신합니다.
 // 피그마 Selected area glow 54×26 — 핀 끝보다 2 왼쪽, 9 아래가 중심
 const GLOW = { width: 54, height: 26, dx: -2, dy: 9 } as const;
 /** 라벨을 핀 위 가운데에 두기 위한 넓은 상자 (말풍선은 그 안에서 가운데 정렬) */
@@ -146,7 +146,7 @@ const styles = StyleSheet.create({
   layer: { position: "absolute", left: 0, top: 0 },
   ground: { position: "absolute", left: 0, top: 0, width: 22, height: 7, borderRadius: radius.pill, backgroundColor: colors.charcoal },
   pulse: { width: GLOW.width, height: GLOW.height, borderRadius: radius.pill, borderWidth: 1.5, borderColor: colors.green, backgroundColor: colors.glow },
-  pin: { width: PIN.width, height: PIN.height, transformOrigin: "50% 96%", filter: PIN_SHADOW },
+  pin: { width: PIN.width, height: PIN.height, transformOrigin: "50% 96%" },
   labelBox: { width: LABEL_BOX, height: PIN.labelHeight, alignItems: "center", transformOrigin: "50% 100%" },
   // 피그마 Selected destination: white, r10, 그림자 2 5 10, Caption darkgreen
   label: {
