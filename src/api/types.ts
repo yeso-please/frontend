@@ -6,7 +6,9 @@ export type RegionSelection = "RANDOM" | "CONDITIONAL" | "MANUAL";
 export type TasteStatus = "READY" | "PENDING" | "FAILED";
 
 // ── 인증 ──
-export type User = { id: number; email: string; nickname: string; profileImage: string | null };
+/** 카카오로 가입한 소셜 전용 회원은 email이 null입니다 */
+export type User = { id: number; email: string | null; nickname: string; profileImage: string | null };
+export type LoginMethod = "EMAIL" | "KAKAO";
 export type AuthResponse = {
   user: User;
   accessToken: string;
@@ -14,9 +16,9 @@ export type AuthResponse = {
   expiresInSeconds: number;
   onboardingCompleted: boolean;
 };
-export type Me = User & { onboardingCompleted: boolean };
+export type Me = User & { onboardingCompleted: boolean; loginMethods: LoginMethod[] };
 
-// ── 온보딩 (aihub-traveler-v1) ──
+// ── 온보딩 (aihub-traveler-v2: AI Hub 설문 + 여행 MBTI 12문항) ──
 export type TravelStyleQuestion = {
   number: number;
   leftPole: string;
@@ -27,6 +29,8 @@ export type TravelStyleQuestion = {
   evidence: "OFFICIAL" | "INFERRED";
 };
 export type TravelMotive = { code: number; label: string };
+/** 선택지가 어느 글자(E/I 등)로 이어지는지는 서버만 압니다 */
+export type MbtiQuestion = { number: number; question: string; choices: { choice: 1 | 2; label: string }[] };
 export type OnboardingQuestions = {
   questionVersion: string;
   travelStyles: TravelStyleQuestion[];
@@ -35,6 +39,8 @@ export type OnboardingQuestions = {
   maxLikedRegions: number;
   excludeTags: string[];
   scheduleDensityOptions: ScheduleDensity[];
+  /** v2부터. v1 서버면 없을 수 있습니다 */
+  mbtiQuestions?: MbtiQuestion[];
 };
 export type OnboardingSubmissionRequest = {
   questionVersion: string;
@@ -43,8 +49,14 @@ export type OnboardingSubmissionRequest = {
   likedRegions: string[];
   scheduleDensity: ScheduleDensity;
   excludeTags: string[];
+  /** v2면 필수: 키 "1"~"12", 값 1 또는 2 */
+  mbtiAnswers?: Record<string, 1 | 2>;
 };
-export type OnboardingSubmission = OnboardingSubmissionRequest & {
+// 응답에는 excludeTags·mbtiAnswers가 없습니다 (백엔드 OnboardingSubmissionResponse 기준).
+export type OnboardingSubmission = Omit<OnboardingSubmissionRequest, "excludeTags" | "mbtiAnswers"> & {
+  excludeTags?: string[];
+  /** v2면 서버가 계산한 4글자 MBTI, v1이면 null. 표시용이며 추천에는 쓰이지 않습니다 */
+  mbtiCode: string | null;
   submissionId: string;
   profileText: string;
   tasteStatus: TasteStatus;

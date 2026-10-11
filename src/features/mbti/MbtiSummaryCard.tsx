@@ -1,22 +1,25 @@
+import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import { router } from "expo-router";
 import { StyleSheet, View } from "react-native";
 
+import { onboardingApi } from "@/api/endpoints";
+import { queryKeys } from "@/api/queryKeys";
 import { Icons } from "@/components/icons";
 import { AppText, Button, PressableScale } from "@/components/ui";
-import { useMbtiStore } from "@/store/mbti";
 import { colors, fonts, radius, space } from "@/theme";
 
 import { MBTI_IMAGES, MBTI_PROFILES } from "./profiles";
-import { useMbtiHydrated } from "./useMbtiHydrated";
+import { isMbtiType } from "./types";
 
-/** MY 탭 "여행 MBTI 검사" 카드 — 결과가 있으면 캐릭터·유형·이름, 없으면 검사 시작 */
+/** MY 탭 "여행 MBTI" 카드 — 서버 mbtiCode가 있으면 캐릭터·유형·이름, 없으면(구형 설문) 다시 설문하기 */
 export function MbtiSummaryCard() {
-  const hydrated = useMbtiHydrated();
-  const result = useMbtiStore((s) => s.result);
+  const onboarding = useQuery({ queryKey: queryKeys.myOnboarding, queryFn: onboardingApi.me });
+  const type = onboarding.data?.submission?.mbtiCode;
 
-  if (hydrated && result) {
-    const profile = MBTI_PROFILES[result.type];
+  if (isMbtiType(type)) {
+    const profile = MBTI_PROFILES[type];
+    const result = { type };
     return (
       <PressableScale
         onPress={() => router.push("/my/mbti/result")}
@@ -38,7 +41,7 @@ export function MbtiSummaryCard() {
                 {result.type}
               </AppText>
             </View>
-            <AppText variant="label" numberOfLines={1} style={styles.name}>
+            <AppText variant="label" numberOfLines={2} style={styles.name}>
               {profile.name}
             </AppText>
           </View>
@@ -58,13 +61,13 @@ export function MbtiSummaryCard() {
           <Icons.Spark width={20} height={20} />
         </View>
         <View style={styles.texts}>
-          <AppText variant="label">여행 MBTI 검사</AppText>
+          <AppText variant="label">여행 MBTI</AppText>
           <AppText variant="small13" color="muted">
-            12개의 질문으로 나의 여행 성향을 알아봐요.
+            {onboarding.isPending ? "불러오는 중이에요" : "취향 설문을 다시 하면 12개의 질문으로 나의 여행 성향을 알 수 있어요."}
           </AppText>
         </View>
       </View>
-      <Button label="검사 시작하기" variant="secondary" height={44} onPress={() => router.push("/my/mbti")} />
+      <Button label="취향 설문 다시 하기" variant="secondary" height={44} disabled={onboarding.isPending} onPress={() => router.push("/my/taste")} />
     </View>
   );
 }
@@ -75,8 +78,10 @@ const styles = StyleSheet.create({
   thumb: { width: 64, height: 64, borderRadius: radius.md, backgroundColor: colors.surface, overflow: "hidden", alignItems: "center", justifyContent: "center" },
   thumbImage: { width: 64, height: 64 },
   texts: { flex: 1, gap: 2 },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  typeChip: { height: 18, paddingHorizontal: 6, borderRadius: radius.sm, backgroundColor: colors.mint, justifyContent: "center" },
+  nameRow: { flexDirection: "row", alignItems: "flex-start", gap: 6 },
+  // 긴 유형 이름("반짝이는 분위기 메이커")은 두 줄까지
+
+  typeChip: { height: 18, marginTop: 3, paddingHorizontal: 6, borderRadius: radius.sm, backgroundColor: colors.mint, justifyContent: "center" },
   typeText: { fontFamily: fonts.bold, lineHeight: 16 },
   name: { flexShrink: 1 },
   startHead: { flexDirection: "row", alignItems: "center", gap: space[12] },

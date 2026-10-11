@@ -12,7 +12,6 @@ import { Icons } from "@/components/icons";
 import { AppText, PressableScale, Screen } from "@/components/ui";
 import { MbtiSummaryCard } from "@/features/mbti";
 import { useAuthStore } from "@/store/auth";
-import { useMbtiStore } from "@/store/mbti";
 import { colors, motion, radius, screenPadding, sizes, space } from "@/theme";
 
 const enter = (i: number) => FadeInDown.delay(motion.stagger * i).springify().damping(motion.spring.gentle.damping);
@@ -31,8 +30,6 @@ export default function MyScreen() {
       await before?.();
     } finally {
       queryClient.clear();
-      // 여행 MBTI 결과는 기기에만 저장되므로 다른 계정에 남지 않게 지웁니다
-      useMbtiStore.getState().clear();
       useAuthStore.getState().signOut();
     }
   };
@@ -71,11 +68,10 @@ export default function MyScreen() {
             <AppText variant="cardTitle" numberOfLines={1}>
               {`${nickname}님`}
             </AppText>
-            {user?.email ? (
-              <AppText variant="small13" color="muted" numberOfLines={1}>
-                {user.email}
-              </AppText>
-            ) : null}
+            {/* 카카오로 가입한 소셜 전용 회원은 email이 없습니다 */}
+            <AppText variant="small13" color="muted" numberOfLines={1}>
+              {user?.email ?? "카카오 계정으로 로그인 중"}
+            </AppText>
           </View>
         </Animated.View>
 
@@ -97,7 +93,7 @@ export default function MyScreen() {
                 </AppText>
               </View>
             ) : null}
-            <Row label="여행 취향 다시 설정" description="여행 스타일·동기·좋아한 지역을 다시 골라요" href="/my/taste" />
+            <Row label="여행 취향 다시 설정" description="여행 스타일·동기·좋아한 지역과 여행 MBTI를 다시 골라요" href="/my/taste" />
           </View>
         </Animated.View>
 

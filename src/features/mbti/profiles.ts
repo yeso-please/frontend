@@ -1,6 +1,6 @@
 import type { ImageSourcePropType } from "react-native";
 
-import type { MbtiType } from "@/store/mbti";
+import type { MbtiType } from "./types";
 
 // 피그마 TriPin/Profile/Result Template (391:641) 데이터.
 // 이름 16개는 피그마 공식 이름 그대로. 문구는 INFP만 피그마(400:1385) 원문이고 나머지 15개는 초안입니다.

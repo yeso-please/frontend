@@ -14,20 +14,24 @@ type Props = {
   submission: OnboardingSubmission;
   motives: TravelMotive[];
   regions: Region[];
+  /** 고른 "피하고 싶은 것" (제출 응답에는 없어 화면 상태에서 받습니다) */
+  excluded: string[];
   nickname?: string;
+  /** MBTI 결과(B) 아래에 붙이는 요약 카드만 그립니다 */
+  compact?: boolean;
 };
 
 const enter = (i: number) => FadeInDown.delay(motion.stagger * (i + 2)).springify().damping(motion.spring.gentle.damping);
 
 /** 제출 직후 짧은 결과 공개 — 서버 profileText를 중심으로 고른 답을 한눈에 보여 줍니다 (피그마 화면 없음) */
-export function OnboardingResult({ submission, motives, regions, nickname }: Props) {
+export function OnboardingResult({ submission, motives, regions, excluded, nickname, compact }: Props) {
   const motiveLabels = submission.travelMotives.map((code) => motives.find((m) => m.code === code)?.label).filter(Boolean);
   const density = DENSITY_COPY[submission.scheduleDensity];
   const rows: [string, string][] = [
     ["여행 동기", motiveLabels.join(" · ")],
     ["여행 속도", density ? `${density.short} · ${density.subtitle}` : submission.scheduleDensity],
     ["좋아한 여행지", regions.map((r) => shortRegionName(r.province, r.city)).join(" · ")],
-    ["피하고 싶은 것", submission.excludeTags.join(" · ")],
+    ["피하고 싶은 것", excluded.join(" · ")],
   ].filter((row): row is [string, string] => !!row[1]);
 
   const statusNote =
@@ -36,6 +40,32 @@ export function OnboardingResult({ submission, motives, regions, nickname }: Pro
       : submission.tasteStatus === "FAILED"
         ? "취향 반영이 조금 늦어지고 있어요. 그동안 추천은 기본값으로 보여 드려요."
         : null;
+
+  if (compact) {
+    return (
+      <View style={styles.compact}>
+        <AppText variant="small13Bold">취향 분석 결과</AppText>
+        <AppText variant="bodyMedium15" color="darkgreen">
+          {submission.profileText || "취향이 고르게 열려 있는 여행자."}
+        </AppText>
+        {rows.map(([label, value]) => (
+          <View key={label} style={styles.row}>
+            <AppText variant="small12" color="muted" style={styles.rowLabel}>
+              {label}
+            </AppText>
+            <AppText variant="small13Medium" style={styles.rowValue}>
+              {value}
+            </AppText>
+          </View>
+        ))}
+        {statusNote ? (
+          <AppText variant="small12" color="muted">
+            {statusNote}
+          </AppText>
+        ) : null}
+      </View>
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -101,4 +131,5 @@ const styles = StyleSheet.create({
   row: { flexDirection: "row", alignItems: "flex-start", gap: space[8] },
   rowLabel: { width: 84, paddingTop: 1 },
   rowValue: { flex: 1 },
+  compact: { backgroundColor: colors.mint, borderRadius: radius.lg, paddingHorizontal: space[16], paddingVertical: space[16], gap: space[8], marginTop: space[8] },
 });

@@ -1,11 +1,6 @@
-import type { MbtiType } from "@/store/mbti";
-
-// 여행 MBTI 12문항과 글자 매핑.
-// 출처: backend docs/api/profile.md "부록. 구형 설문 기록 (demo-mbti-v1, legacy)"
-//      backend src/main/java/com/yeso/backend/profile/domain/OnboardingQuestionBank.java QUESTIONS
-// 문구는 원문 그대로입니다 (12번 두 번째 선택지는 문서의 "저_장" 대신 Java 상수의 "저장"을 따릅니다).
-// 이 결과는 앱 안에서만 계산하며 서버(demo-mbti-v1)로 절대 제출하지 않습니다.
-
+// 목업 서버 전용: 여행 MBTI 12문항과 선택지 → 글자 매핑.
+// 실제 백엔드는 이 매핑을 내려주지 않고 서버에서만 계산합니다 (docs/api/profile.md 부록, aihub-traveler-v2).
+// 출처: backend docs/api/profile.md "부록. 여행 MBTI 12문항"
 export type MbtiAxis = "EI" | "SN" | "TF" | "JP";
 export type MbtiLetter = "E" | "I" | "S" | "N" | "T" | "F" | "J" | "P";
 export type MbtiChoice = { text: string; letter: MbtiLetter };
@@ -21,7 +16,7 @@ const q = (number: number, axis: MbtiAxis, text: string, first: [string, MbtiLet
   ],
 });
 
-export const MBTI_QUESTIONS: MbtiQuestion[] = [
+export const MOCK_MBTI_QUESTIONS: MbtiQuestion[] = [
   q(1, "JP", "여행을 떠날 때 계획은", ["내가 걷는 길이 곧 여행코스", "P"], ["계획은 필수", "J"]),
   q(2, "JP", "여행 경비는", ["당장 국제거지만 안되면 되지!", "P"], ["걸어다니는 계산기로 변신", "J"]),
   q(3, "JP", "여행을 다녀온 후", ["홈스윗홈.. 침대로 점프!", "P"], ["캐리어를 열고 물건을 정리한다", "J"]),
@@ -49,13 +44,13 @@ const AXES: [MbtiAxis, MbtiLetter, MbtiLetter][] = [
  * 동점(SN 1:1, JP 2:2)이면 백엔드 규칙과 같이 뒤 글자 I/N/F/P를 고릅니다.
  * @param answers 문항 순서대로 고른 선택지 index (0 또는 1)
  */
-export function computeMbti(answers: readonly (0 | 1)[]): MbtiType {
+export function computeMbti(answers: readonly (0 | 1)[]): string {
   const counts: Partial<Record<MbtiLetter, number>> = {};
-  MBTI_QUESTIONS.forEach((question, i) => {
+  MOCK_MBTI_QUESTIONS.forEach((question, i) => {
     const choice = answers[i];
     if (choice === undefined) return;
     const letter = question.choices[choice].letter;
     counts[letter] = (counts[letter] ?? 0) + 1;
   });
-  return AXES.map(([, front, back]) => ((counts[front] ?? 0) > (counts[back] ?? 0) ? front : back)).join("") as MbtiType;
+  return AXES.map(([, front, back]) => ((counts[front] ?? 0) > (counts[back] ?? 0) ? front : back)).join("");
 }

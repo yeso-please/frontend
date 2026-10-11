@@ -8,7 +8,7 @@ import { onboardingApi, tripApi } from "@/api/endpoints";
 import { queryKeys } from "@/api/queryKeys";
 import { Icons } from "@/components/icons";
 import { AppText, BottomCTA, Button, Screen, TopBar } from "@/components/ui";
-import { MBTI_PROFILES } from "@/features/mbti";
+import { isMbtiType, MBTI_PROFILES } from "@/features/mbti";
 import { NoRegionView } from "@/features/trip/components/NoRegionView";
 import { PrepProgress } from "@/features/trip/components/PrepProgress";
 import { RegionTag } from "@/features/trip/components/RegionTag";
@@ -19,7 +19,6 @@ import { truncate } from "@/features/trip/lib";
 import { addDays, formatNights, formatRange } from "@/lib/date";
 import { haptics } from "@/lib/haptics";
 import { shortRegionName, withEuro } from "@/lib/josa";
-import { useMbtiStore } from "@/store/mbti";
 import { useTripDraft } from "@/store/tripDraft";
 import { motion, screenPadding, space } from "@/theme";
 
@@ -31,11 +30,12 @@ export default function TripPrepareScreen() {
   const tripId = useTripDraft((s) => s.tripId);
   const startDate = useTripDraft((s) => s.startDate);
   const nights = useTripDraft((s) => s.nights);
-  const mbti = useMbtiStore((s) => s.result);
   useStaleDraftGuard();
 
-  // 여행 MBTI 결과가 없을 때만 서버 설문 요약(profileText)을 보여줍니다.
-  const onboarding = useQuery({ queryKey: queryKeys.myOnboarding, queryFn: onboardingApi.me, enabled: !mbti });
+  // 최신 온보딩(v2)의 MBTI가 있으면 "INFP · 낭만적인 기록가", 없으면 취향 요약(profileText)을 보여줍니다.
+  const onboarding = useQuery({ queryKey: queryKeys.myOnboarding, queryFn: onboardingApi.me });
+  const mbtiCode = onboarding.data?.submission?.mbtiCode;
+  const mbti = isMbtiType(mbtiCode) ? { type: mbtiCode } : null;
   // 날짜까지 정했으면 친구가 들어왔는지로 3단계 완료를 판단합니다.
   const participants = useQuery({
     queryKey: queryKeys.participants(tripId ?? 0),

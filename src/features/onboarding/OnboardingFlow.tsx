@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
-import { BackHandler, Keyboard, StyleSheet, View } from "react-native";
+import { BackHandler, Keyboard, ScrollView, StyleSheet, View } from "react-native";
 import Animated from "react-native-reanimated";
 import { toast } from "sonner-native";
 
@@ -11,8 +11,10 @@ import { queryKeys } from "@/api/queryKeys";
 import type { OnboardingQuestions, OnboardingSubmission, OnboardingSubmissionRequest, Region, ScheduleDensity } from "@/api/types";
 import { Icons } from "@/components/icons";
 import { BottomCTA, Button, ErrorView, LoadingView, Screen } from "@/components/ui";
+import { isMbtiType, MbtiProfileView, QuestionStep, SurveyTopBar } from "@/features/mbti";
 import { haptics } from "@/lib/haptics";
 import { useAuthStore } from "@/store/auth";
+import { screenPadding, space } from "@/theme";
 
 import { AnalysisView } from "./AnalysisView";
 import { DensityStep } from "./DensityStep";
@@ -38,7 +40,8 @@ type Answers = {
 };
 
 /**
- * AI Hub 온보딩 설문(aihub-traveler-v1).
+ * 온보딩 설문(aihub-traveler-v2): 취향 4단계(스타일·동기·좋아한 지역·여행 방식) → 여행 MBTI 12문항(피그마 S1) → 분석(S3) → 결과(B).
+ * MBTI는 서버가 mbtiAnswers로 계산하는 표시용 분류이며 추천에는 쓰이지 않습니다.
  * - first: 가입 직후. 결과 화면의 "핀 꽂으러 가기"에서 onboardingCompleted를 켜면 루트 가드가 탭으로 바꿉니다.
  * - retake: MY → "여행 취향 다시 설정". 이전 답을 채워 두고, 끝나면 토스트 후 뒤로 갑니다.
  */
@@ -100,11 +103,12 @@ function initialAnswers(questions: OnboardingQuestions, previous: OnboardingSubm
       .filter((r): r is Region => !!r)
       .slice(0, questions.maxLikedRegions),
     density: questions.scheduleDensityOptions.includes(previous.scheduleDensity) ? previous.scheduleDensity : null,
-    excluded: previous.excludeTags.filter((t) => questions.excludeTags.includes(t)),
+    // 제출 응답에는 excludeTags가 없을 수 있습니다 (백엔드 OnboardingSubmissionResponse)
+    excluded: (previous.excludeTags ?? []).filter((t) => questions.excludeTags.includes(t)),
   };
 }
 
-type Phase = "form" | "analyzing" | "result";
+type Phase = "form" | "mbti" | "analyzing" | "result";
 
 function OnboardingForm({ mode, questions, initial, onRestart }: { mode: OnboardingMode; questions: OnboardingQuestions; initial: Answers; onRestart: () => void }) {
   const queryClient = useQueryClient();
@@ -119,6 +123,10 @@ function OnboardingForm({ mode, questions, initial, onRestart }: { mode: Onboard
   const [density, setDensity] = useState(initial.density);
   const [excluded, setExcluded] = useState(initial.excluded);
   const [submission, setSubmission] = useState<OnboardingSubmission | null>(null);
+  // 여행 MBTI 12문항 (v2). 서버가 이전 답을 돌려주지 않아 다시 설정할 때도 새로 답합니다.
+  const mbtiQuestions = questions.mbtiQuestions ?? [];
+  const [mbtiIndex, setMbtiIndex] = useState(0);
+  const [mbtiAnswers, setMbtiAnswers] = useState<Record<string, 1 | 2>>({});
   const submitMutation = useMutation({ mutationFn: onboardingApi.submit });
 
   const canNext = step === 1 ? motives.length > 0 : step === 3 ? density !== null : true;
@@ -130,9 +138,35 @@ function OnboardingForm({ mode, questions, initial, onRestart }: { mode: Onboard
   };
 
   const back = () => {
+    if (phase === "mbti") {
+      go(-1);
+      if (mbtiIndex > 0) setMbtiIndex(mbtiIndex - 1);
+      else setPhase("form");
+      return;
+    }
     if (phase !== "form") return;
     if (step > 0) goTo(step - 1);
     else if (mode === "retake") router.back();
+  };
+
+  const currentMbti = mbtiQuestions[mbtiIndex];
+  const nextMbti = () => {
+    if (!currentMbti || !mbtiAnswers[String(currentMbti.number)]) return;
+    if (mbtiIndex < mbtiQuestions.length - 1) {
+      go(1);
+      setMbtiIndex(mbtiIndex + 1);
+    } else submit();
+  };
+
+  // 취향 4단계를 마치면 MBTI 문항으로 (v1 서버처럼 문항이 없으면 바로 제출)
+  const finishForm = () => {
+    if (mbtiQuestions.length === 0) {
+      submit();
+      return;
+    }
+    Keyboard.dismiss();
+    go(1);
+    setPhase("mbti");
   };
 
   // Android 뒤로가기: 단계 안에서는 이전 단계로, 분석 중에는 막습니다
@@ -140,6 +174,12 @@ function OnboardingForm({ mode, questions, initial, onRestart }: { mode: Onboard
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       if (phase === "analyzing") return true;
       if (phase === "result") return mode === "first";
+      if (phase === "mbti") {
+        go(-1);
+        if (mbtiIndex > 0) setMbtiIndex(mbtiIndex - 1);
+        else setPhase("form");
+        return true;
+      }
       if (step > 0) {
         Keyboard.dismiss();
         go(-1);
@@ -149,7 +189,7 @@ function OnboardingForm({ mode, questions, initial, onRestart }: { mode: Onboard
       return false;
     });
     return () => sub.remove();
-  }, [phase, step, mode, go]);
+  }, [phase, step, mode, go, mbtiIndex]);
 
   const submit = async () => {
     if (!density) return;
@@ -164,6 +204,7 @@ function OnboardingForm({ mode, questions, initial, onRestart }: { mode: Onboard
       likedRegions: regions.map((r) => r.sigCd),
       scheduleDensity: density,
       excludeTags: excluded,
+      ...(mbtiQuestions.length ? { mbtiAnswers } : {}),
     };
     try {
       const res = await submitMutation.mutateAsync(body);
@@ -186,7 +227,12 @@ function OnboardingForm({ mode, questions, initial, onRestart }: { mode: Onboard
       haptics.reject();
       toast.error(errorMessage(e));
       go(-1);
-      setPhase("form");
+      // MBTI 답이 빠졌거나 잘못됐으면 첫 문항부터, 그 밖에는 취향 단계로 돌아갑니다
+      const mbtiError = isApiError(e, "ONBOARDING_MISSING_QUESTION_ANSWER") || isApiError(e, "ONBOARDING_INVALID_CHOICE");
+      if (mbtiError && mbtiQuestions.length) {
+        setMbtiIndex(0);
+        setPhase("mbti");
+      } else setPhase("form");
     }
   };
 
@@ -202,7 +248,8 @@ function OnboardingForm({ mode, questions, initial, onRestart }: { mode: Onboard
     router.back();
   };
 
-  const contentKey = phase === "form" ? `step-${step}` : phase;
+  const contentKey = phase === "form" ? `step-${step}` : phase === "mbti" ? `mbti-${mbtiIndex}` : phase;
+  const mbtiTotal = mbtiQuestions.length;
 
   const renderStep = () => {
     switch (step) {
@@ -230,24 +277,63 @@ function OnboardingForm({ mode, questions, initial, onRestart }: { mode: Onboard
 
   return (
     <Screen>
-      <OnboardingHeader showBack={phase === "form" && (step > 0 || mode === "retake")} onBack={back} step={phase === "form" ? step : null} total={STEP_COUNT} />
+      {phase === "mbti" || phase === "analyzing" ? (
+        // 피그마 S1·S3 Survey Top Bar ("n / 12", 분석 중이면 "완료")
+        <SurveyTopBar
+          counter={phase === "analyzing" ? "완료" : `${mbtiIndex + 1} / ${mbtiTotal}`}
+          progress={phase === "analyzing" ? 1 : (mbtiIndex + 1) / Math.max(mbtiTotal, 1)}
+          complete={phase === "analyzing"}
+          onBack={back}
+          showBack={phase === "mbti"}
+        />
+      ) : (
+        <OnboardingHeader showBack={phase === "form" && (step > 0 || mode === "retake")} onBack={back} step={phase === "form" ? step : null} total={STEP_COUNT} />
+      )}
 
       <View style={styles.body}>
         <Animated.View key={contentKey} entering={entering} exiting={exiting} style={styles.page}>
           {phase === "form" ? renderStep() : null}
-          {phase === "analyzing" ? <AnalysisView footnote="곧, 나에게 맞는 여행을 추천해 드릴게요." /> : null}
-          {phase === "result" && submission ? <OnboardingResult submission={submission} motives={questions.travelMotives} regions={regions} nickname={nickname} /> : null}
+          {phase === "mbti" && currentMbti ? (
+            <QuestionStep
+              question={currentMbti}
+              answer={mbtiAnswers[String(currentMbti.number)] ?? null}
+              onAnswer={(choice) => setMbtiAnswers((prev) => ({ ...prev, [String(currentMbti.number)]: choice }))}
+            />
+          ) : null}
+          {phase === "analyzing" ? <AnalysisView footnote="곧, 나의 여행 성향을 만나요." /> : null}
+          {phase === "result" && submission ? (
+            isMbtiType(submission.mbtiCode) ? (
+              // 피그마 B · 성향 결과 + 아래에 서버 취향 요약
+              <ScrollView contentContainerStyle={styles.resultContent} showsVerticalScrollIndicator={false}>
+                <MbtiProfileView type={submission.mbtiCode}>
+                  <OnboardingResult submission={submission} motives={questions.travelMotives} regions={regions} excluded={excluded} compact />
+                </MbtiProfileView>
+              </ScrollView>
+            ) : (
+              <OnboardingResult submission={submission} motives={questions.travelMotives} regions={regions} excluded={excluded} nickname={nickname} />
+            )
+          ) : null}
         </Animated.View>
       </View>
 
       {phase === "form" ? (
         <BottomCTA>
           <Button
-            label={step === STEP_COUNT - 1 ? "취향 분석하기" : skipRegions ? "건너뛰기" : "다음"}
+            label={step === STEP_COUNT - 1 ? (mbtiQuestions.length ? "다음" : "취향 분석하기") : skipRegions ? "건너뛰기" : "다음"}
             variant={skipRegions ? "secondary" : "primary"}
             disabled={!canNext}
-            onPress={() => (step === STEP_COUNT - 1 ? submit() : goTo(step + 1))}
+            onPress={() => (step === STEP_COUNT - 1 ? finishForm() : goTo(step + 1))}
             accessibilityHint={!canNext ? (step === 1 ? "여행 동기를 하나 이상 골라주세요" : "여행 속도를 골라주세요") : undefined}
+          />
+        </BottomCTA>
+      ) : null}
+      {phase === "mbti" && currentMbti ? (
+        <BottomCTA>
+          <Button
+            label={mbtiIndex === mbtiTotal - 1 ? "내 여행 성향 보기" : "다음"}
+            disabled={!mbtiAnswers[String(currentMbti.number)]}
+            onPress={nextMbti}
+            accessibilityHint={!mbtiAnswers[String(currentMbti.number)] ? "답을 하나 골라주세요" : undefined}
           />
         </BottomCTA>
       ) : null}
@@ -267,4 +353,5 @@ function OnboardingForm({ mode, questions, initial, onRestart }: { mode: Onboard
 const styles = StyleSheet.create({
   body: { flex: 1, overflow: "hidden" },
   page: { flex: 1 },
+  resultContent: { paddingHorizontal: screenPadding, paddingTop: space[8], paddingBottom: space[24] },
 });

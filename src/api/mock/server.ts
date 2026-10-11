@@ -13,10 +13,11 @@ import type {
   ScheduleDensity,
   TripContext,
 } from "../types";
+import { computeMbti, MOCK_MBTI_QUESTIONS } from "./mbti";
 import regionsData from "./regions.json";
 
 type Raw = { status: number; json: unknown };
-type MockUser = { id: number; email: string; password: string; nickname: string };
+type MockUser = { id: number; email: string | null; password: string | null; nickname: string; kakaoId?: string };
 type MockTrip = TripContext & { participants: number[]; createdBy: number };
 type MockDb = {
   users: MockUser[];
@@ -28,8 +29,10 @@ type MockDb = {
   seq: number;
 };
 
-const STORAGE_KEY = "tripin.mock.db.v1";
-const LATENCY_MS = 350;
+// v2: 온보딩 v2(MBTI) · 카카오 로그인 반영. 이전 목업 데이터와 모양이 달라 새 키를 씁니다.
+const STORAGE_KEY = "tripin.mock.db.v2";
+// 실제 네트워크처럼 약간 늦게 응답합니다 (테스트에서는 바로)
+const LATENCY_MS = process.env.NODE_ENV === "test" ? 0 : 350;
 
 const FRIENDS = [
   { userId: 12, nickname: "민지", since: "2026-09-20T12:00:00" },
@@ -132,7 +135,7 @@ const CARDS: Record<string, Partial<RegionCard>> = {
 
 // ── 온보딩 ──
 const QUESTIONS: OnboardingQuestions = {
-  questionVersion: "aihub-traveler-v1",
+  questionVersion: "aihub-traveler-v2",
   travelStyles: [
     { number: 1, leftPole: "자연", rightPole: "도시", minValue: 1, maxValue: 7, neutralValue: 4, evidence: "OFFICIAL" },
     { number: 3, leftPole: "새로운 지역", rightPole: "익숙한 지역", minValue: 1, maxValue: 7, neutralValue: 4, evidence: "INFERRED" },
@@ -154,7 +157,17 @@ const QUESTIONS: OnboardingQuestions = {
   maxLikedRegions: 3,
   excludeTags: ["계단·경사 많은 곳", "물놀이", "야간 이동", "오래 걷기"],
   scheduleDensityOptions: ["RELAXED", "PACKED"],
+  // 실제 서버처럼 선택지 → 글자 매핑은 내려주지 않습니다
+  mbtiQuestions: MOCK_MBTI_QUESTIONS.map((q) => ({
+    number: q.number,
+    question: q.text,
+    choices: [
+      { choice: 1 as const, label: q.choices[0].text },
+      { choice: 2 as const, label: q.choices[1].text },
+    ],
+  })),
 };
+const SUPPORTED_VERSIONS = ["aihub-traveler-v2", "aihub-traveler-v1"];
 
 const profileText = (req: OnboardingSubmissionRequest) => {
   const parts = QUESTIONS.travelStyles
@@ -175,6 +188,8 @@ type Handler = (ctx: Ctx, params: string[]) => Raw;
 const routes: [string, RegExp, Handler, { auth?: boolean }?][] = [];
 const on = (method: string, pattern: string, handler: Handler, opts?: { auth?: boolean }) =>
   routes.push([method, new RegExp(`^${pattern.replace(/:\w+/g, "([^/]+)")}$`), handler, opts]);
+
+const loginMethods = (u: MockUser) => [...(u.password ? ["EMAIL"] : []), ...(u.kakaoId ? ["KAKAO"] : [])];
 
 const authResponse = (u: MockUser, d: MockDb): AuthResponse => ({
   user: { id: u.id, email: u.email, nickname: u.nickname, profileImage: null },
@@ -205,6 +220,21 @@ on("POST", "/auth/login", ({ db: d, body }) => {
   return ok(authResponse(user, d));
 }, { auth: false });
 
+// 카카오 로그인: 목업은 카카오 서버 없이 code를 회원번호처럼 써서 소셜 전용 회원을 만듭니다.
+on("POST", "/auth/kakao", ({ db: d, body }) => {
+  if (!body?.code || !body?.redirectUri) return fail(400, "COMMON_INVALID_REQUEST", "요청 값이 올바르지 않습니다.");
+  if (body.code === "invalid") return fail(401, "AUTH_KAKAO_INVALID_CODE", "카카오 로그인을 다시 시도해 주세요.");
+  const kakaoId = String(body.code).slice(0, 32);
+  let user = d.users.find((u) => u.kakaoId === kakaoId);
+  const created = !user;
+  if (!user) {
+    user = { id: ++d.seq, email: null, password: null, nickname: `여행자${String(1000 + (d.seq % 9000))}`, kakaoId };
+    d.users.push(user);
+  }
+  d.sessionUserId = user.id;
+  return ok(authResponse(user, d), created ? 201 : 200);
+}, { auth: false });
+
 on("POST", "/auth/refresh", ({ db: d }) => {
   const user = d.users.find((u) => u.id === d.sessionUserId);
   if (!user) return fail(401, "AUTH_INVALID_REFRESH_TOKEN", "다시 로그인해 주세요.");
@@ -216,24 +246,38 @@ on("POST", "/auth/logout", ({ db: d }) => {
   return ok(null, 204);
 }, { auth: false });
 
-on("GET", "/users/me", ({ db: d, me }) => ok({ id: me!.id, email: me!.email, nickname: me!.nickname, profileImage: null, onboardingCompleted: !!d.submissions[me!.id] }));
+on("GET", "/users/me", ({ db: d, me }) =>
+  ok({ id: me!.id, email: me!.email, nickname: me!.nickname, profileImage: null, onboardingCompleted: !!d.submissions[me!.id], loginMethods: loginMethods(me!) }),
+);
 
 on("GET", "/onboarding/questions", () => ok(QUESTIONS), { auth: false });
 
 on("POST", "/onboarding/submissions", ({ db: d, me, body }) => {
   const req = body as OnboardingSubmissionRequest;
-  if (req.questionVersion !== QUESTIONS.questionVersion) return fail(400, "ONBOARDING_INVALID_QUESTION_VERSION", "설문이 바뀌었어요. 다시 불러와 주세요.");
+  if (!SUPPORTED_VERSIONS.includes(req.questionVersion)) return fail(400, "ONBOARDING_INVALID_QUESTION_VERSION", "설문이 바뀌었어요. 다시 불러와 주세요.");
+  let mbtiCode: string | null = null;
+  if (req.questionVersion === "aihub-traveler-v2") {
+    const answers = req.mbtiAnswers ?? {};
+    const numbers = MOCK_MBTI_QUESTIONS.map((q) => String(q.number));
+    if (Object.keys(answers).some((k) => !numbers.includes(k) || ![1, 2].includes(answers[k])))
+      return fail(400, "ONBOARDING_INVALID_CHOICE", "여행 MBTI 답이 올바르지 않습니다.");
+    if (numbers.some((n) => !answers[n])) return fail(400, "ONBOARDING_MISSING_QUESTION_ANSWER", "답하지 않은 여행 MBTI 문항이 있어요.");
+    mbtiCode = computeMbti(numbers.map((n) => (answers[n] === 1 ? 0 : 1)));
+  }
   const keys = ["1", "3", "5", "6"];
   if (!keys.every((k) => Number.isInteger(req.travelStyles?.[k]) && req.travelStyles[k] >= 1 && req.travelStyles[k] <= 7))
     return fail(400, "ONBOARDING_INVALID_TRAVEL_STYLES", "여행 스타일 답이 올바르지 않습니다.");
   if ((req.travelMotives ?? []).length > 3) return fail(400, "ONBOARDING_INVALID_TRAVEL_MOTIVE", "여행 동기는 최대 3개입니다.");
   if ((req.likedRegions ?? []).length > 3) return fail(400, "ONBOARDING_TOO_MANY_LIKED_REGIONS", "좋아하는 지역은 최대 3곳입니다.");
   if (!["RELAXED", "PACKED"].includes(req.scheduleDensity)) return fail(400, "ONBOARDING_INVALID_SCHEDULE_DENSITY", "일정 밀도를 골라 주세요.");
+  // 실제 응답처럼 excludeTags·mbtiAnswers는 돌려주지 않습니다 (백엔드 OnboardingSubmissionResponse)
   const submission: OnboardingSubmission = {
-    ...req,
+    questionVersion: req.questionVersion,
+    travelStyles: req.travelStyles,
+    scheduleDensity: req.scheduleDensity,
     travelMotives: req.travelMotives ?? [],
     likedRegions: req.likedRegions ?? [],
-    excludeTags: req.excludeTags ?? [],
+    mbtiCode,
     submissionId: token("sub_"),
     profileText: profileText(req),
     tasteStatus: "READY",
