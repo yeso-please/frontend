@@ -16,6 +16,14 @@ type Props = {
   onRetry: () => void;
 };
 
+/**
+ * 화면에는 링크를 줄여 보여 줍니다 (tripin://invite/iv_3Qk9…f8Zq). 복사·공유는 원문 그대로입니다.
+ * 안드로이드의 가운데 말줄임(ellipsizeMode="middle")은 공백 없는 긴 토큰을 말줄임표 없이 잘라 버려서 직접 줄입니다.
+ */
+export function shortLink(link: string, head = 26, tail = 4) {
+  return link.length <= head + tail + 1 ? link : `${link.slice(0, head)}…${link.slice(-tail)}`;
+}
+
 /** 피그마 TriPin/Invitation/Invite Card — 링크 복사(outline) / 초대 링크 공유(mint) */
 export function InviteCard({ link, status, onCopy, onShare, onRetry }: Props) {
   const ready = status === "ready" && !!link;
@@ -27,8 +35,8 @@ export function InviteCard({ link, status, onCopy, onShare, onRetry }: Props) {
         {status === "loading" ? <Skeleton width="62%" height={14} /> : null}
         {ready ? (
           <Animated.View entering={FadeIn.duration(220)}>
-            <AppText variant="small12" color="muted" numberOfLines={1} ellipsizeMode="middle" selectable accessibilityLabel="초대 링크">
-              {link}
+            <AppText variant="small12" color="muted" numberOfLines={1} accessibilityLabel="초대 링크">
+              {shortLink(link)}
             </AppText>
           </Animated.View>
         ) : null}

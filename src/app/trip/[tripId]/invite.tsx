@@ -2,24 +2,25 @@ import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as Clipboard from "expo-clipboard";
 import { router, useIsFocused, useLocalSearchParams } from "expo-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ScrollView, Share, StyleSheet, View } from "react-native";
-import Animated, { FadeInDown } from "react-native-reanimated";
+import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
 import { LINK_BASE_URL } from "@/api/config";
 import { inviteApi, tripApi } from "@/api/endpoints";
 import { errorMessage, isApiError } from "@/api/errors";
 import { queryKeys } from "@/api/queryKeys";
-import type { FriendInvite, Participant } from "@/api/types";
+import type { FriendInvite, Participant, SentFriendInvite } from "@/api/types";
 import { Icons } from "@/components/icons";
-import { AppText, BottomCTA, Button, EmptyView, ErrorView, LoadingView, PressableScale, Screen, TopBar } from "@/components/ui";
+import { AppText, Button, EmptyView, ErrorView, LoadingView, PressableScale, Screen, TopBar } from "@/components/ui";
 import { FriendPickerSheet } from "@/features/trip/components/FriendPickerSheet";
 import { InlineNotice } from "@/features/trip/components/InlineNotice";
 import { InviteCard } from "@/features/trip/components/InviteCard";
-import { SharedPreferenceHint } from "@/features/trip/components/SharedPreferenceHint";
 import { Skeleton } from "@/features/trip/components/Skeleton";
 import { TravelerRow, type TravelerRowModel } from "@/features/trip/components/TravelerRow";
+import { TripSummaryCard } from "@/features/trip/components/TripSummaryCard";
 import { AVATAR_SIZE, TRAVELERS_POLL_MS } from "@/features/trip/constants";
 import { useRegionLabel } from "@/features/trip/hooks/useRegionLabel";
 import { tripFlowKeys } from "@/features/trip/queryKeys";
@@ -27,20 +28,25 @@ import { formatNights, formatRange } from "@/lib/date";
 import { haptics } from "@/lib/haptics";
 import { withEuro } from "@/lib/josa";
 import { useAuthStore } from "@/store/auth";
-import { motion, screenPadding, sizes, space } from "@/theme";
+import { colors, motion, radius, screenPadding, sizes, space } from "@/theme";
 
-type Travelers = { participants: Participant[]; invites: FriendInvite[] };
+type Travelers = { participants: Participant[]; invites: SentFriendInvite[] };
 type PendingRow = Extract<TravelerRowModel, { kind: "pending" }>;
 
-/** 피그마 D · 친구 초대 (400:1411) */
+const enter = (i: number) => FadeInDown.delay(motion.stagger * i).springify().damping(motion.spring.gentle.damping);
+
+/** 피그마 D1 · 친구 초대 / D1a · 초대 전송 완료 (여행 준비 3/4) */
 export default function TripInviteScreen() {
   const params = useLocalSearchParams<{ tripId: string }>();
   const tripId = Number(params.tripId);
   const valid = Number.isInteger(tripId) && tripId > 0;
   const isFocused = useIsFocused();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const me = useAuthStore((s) => s.user);
   const sheetRef = useRef<BottomSheetModal>(null);
+  /** D1a — 링크를 공유·복사했거나 친구 초대를 보냈으면 "초대 링크를 공유했어요"를 보여 줍니다 */
+  const [shared, setShared] = useState(false);
 
   const context = useQuery({ queryKey: queryKeys.tripContext(tripId), queryFn: () => tripApi.context(tripId), enabled: valid });
   const regionLabel = useRegionLabel(context.data?.regionSigCd);
@@ -58,13 +64,13 @@ export default function TripInviteScreen() {
     refetchOnReconnect: false,
   });
 
-  // 참여자 + 보낸 친구 초대를 한 번에 받아(5초마다, 화면이 보일 때만) 대기 → 함께하는 중 이동을 한 번에 그립니다.
+  // 참여자 + 보낸 친구 초대를 한 번에 받아(5초마다, 화면이 보일 때만) 대기 → 참여 이동을 한 번에 그립니다.
   const travelersKey = tripFlowKeys.travelers(tripId);
   const travelers = useQuery({
     queryKey: travelersKey,
     queryFn: async (): Promise<Travelers> => {
       const [participants, invites] = await Promise.all([tripApi.participants(tripId), inviteApi.friendInvites(tripId)]);
-      // 다른 화면(여행 준비·여행 홈)이 쓰는 공용 키도 같이 채워 둡니다.
+      // 홈 카드(준비 단계)·코스 화면이 쓰는 공용 키도 같이 채워 둡니다.
       queryClient.setQueryData(queryKeys.participants(tripId), participants);
       queryClient.setQueryData(queryKeys.friendInvites(tripId), invites);
       return { participants, invites };
@@ -77,6 +83,7 @@ export default function TripInviteScreen() {
   const joinedIds = new Set(participants.map((p) => p.userId));
   const pendingInvites = (travelers.data?.invites ?? []).filter((i) => i.status === "PENDING" && !joinedIds.has(i.invitee.userId));
   const pendingIds = new Set(pendingInvites.map((i) => i.invitee.userId));
+  const creator = participants.find((p) => p.isCreator) ?? participants[0];
 
   const sortedParticipants = [...participants].sort((a, b) => {
     if (a.userId === me?.id) return -1;
@@ -84,8 +91,27 @@ export default function TripInviteScreen() {
     return a.joinedAt.localeCompare(b.joinedAt);
   });
   const rows: TravelerRowModel[] = [
-    ...sortedParticipants.map((p): TravelerRowModel => ({ key: `u${p.userId}`, userId: p.userId, nickname: p.nickname, kind: "joined", isMe: p.userId === me?.id })),
-    ...pendingInvites.map((i): TravelerRowModel => ({ key: `u${i.invitee.userId}`, userId: i.invitee.userId, nickname: i.invitee.nickname, kind: "pending", inviteId: i.id })),
+    ...sortedParticipants.map(
+      (p): TravelerRowModel => ({
+        key: `u${p.userId}`,
+        userId: p.userId,
+        nickname: p.nickname,
+        kind: "joined",
+        tag: p.userId === me?.id ? "나" : undefined,
+        // 참여자는 모두 최초 설문을 마친 회원입니다 (서버 규칙).
+        status: p.userId === me?.id ? "취향 설문 완료" : "참여 완료 · 취향 설문 완료",
+      }),
+    ),
+    ...pendingInvites.map(
+      (i): TravelerRowModel => ({
+        key: `u${i.invitee.userId}`,
+        userId: i.invitee.userId,
+        nickname: i.invitee.nickname,
+        kind: "pending",
+        inviteId: i.id,
+        status: shared ? "초대 전송 · 응답 대기" : "응답 대기 중",
+      }),
+    ),
   ];
 
   // 대기 중이던 친구가 참여자가 되면 살짝 알려 줍니다.
@@ -127,13 +153,16 @@ export default function TripInviteScreen() {
   });
 
   const onInvited = (invite: FriendInvite) => {
-    queryClient.setQueryData<Travelers>(travelersKey, (old) =>
-      old ? { ...old, invites: [invite, ...old.invites.filter((i) => i.id !== invite.id)] } : old,
-    );
+    const sent: SentFriendInvite = { id: invite.id, invitee: invite.invitee, inviter: { userId: me?.id ?? 0, nickname: me?.nickname ?? "" }, status: invite.status, createdAt: invite.createdAt };
+    queryClient.setQueryData<Travelers>(travelersKey, (old) => (old ? { ...old, invites: [sent, ...old.invites.filter((i) => i.id !== invite.id)] } : old));
     void queryClient.invalidateQueries({ queryKey: travelersKey });
+    setShared(true);
   };
 
-  const finish = () => router.replace({ pathname: "/trip/[tripId]", params: { tripId: String(tripId) } });
+  const finish = () => {
+    void queryClient.invalidateQueries({ queryKey: ["trips"] });
+    router.replace({ pathname: "/trip/[tripId]", params: { tripId: String(tripId) } });
+  };
 
   if (!valid || (context.isError && isApiError(context.error, "TRIP_NOT_FOUND"))) {
     return (
@@ -161,10 +190,11 @@ export default function TripInviteScreen() {
   }
 
   const trip = context.data;
-  const dateLine = `${formatRange(trip.startDate, trip.endDate)} · ${formatNights(trip.nights)}`;
+  const tripTitle = regionLabel ? `${regionLabel} 여행` : null;
   const link = inviteLink.data ? `${LINK_BASE_URL}invite/${inviteLink.data.token}` : null;
   const linkStatus = inviteLink.isError ? "error" : link ? "ready" : "loading";
   const alone = travelers.isSuccess && participants.length <= 1 && pendingInvites.length === 0;
+  const creatorName = creator ? (creator.userId === me?.id ? (me?.nickname ?? creator.nickname) : creator.nickname) : (me?.nickname ?? "");
 
   const copyLink = async () => {
     if (!link) return;
@@ -172,6 +202,7 @@ export default function TripInviteScreen() {
       await Clipboard.setStringAsync(link);
       haptics.confirm();
       toast("링크를 복사했어요");
+      setShared(true);
     } catch {
       haptics.reject();
       toast("링크를 복사하지 못했어요");
@@ -182,7 +213,11 @@ export default function TripInviteScreen() {
     if (!link) return;
     const headline = regionLabel ? `${withEuro(regionLabel)} 떠나는 여행에 함께해요!` : "TriPin 여행에 함께해요!";
     try {
-      await Share.share({ message: `${headline}\n${dateLine}\n${link}` });
+      const result = await Share.share({ message: `${headline}\n${formatRange(trip.startDate, trip.endDate)} · ${formatNights(trip.nights)}\n${link}` });
+      if (result.action === Share.sharedAction) {
+        haptics.confirm();
+        setShared(true);
+      }
     } catch {
       toast("공유하지 못했어요. 링크 복사를 이용해 주세요");
     }
@@ -192,33 +227,40 @@ export default function TripInviteScreen() {
     <Screen>
       <TopBar title="여행 준비 · 3/4" />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.View entering={FadeInDown.springify()} style={styles.intro}>
-          <AppText variant="title">누구와 함께 떠날까요?</AppText>
-          {/* 피그마 원문 "서로의 취향을 반영해 코스를 만들 수 있어요"는 백엔드 정책(만드는 사람 취향으로 생성)과 달라 바꿨습니다. */}
-          <AppText variant="body" color="muted">
-            {"친구를 초대하면 함께 코스를 고치고\n각자의 취향으로 다시 만들 수 있어요."}
+        <Animated.View entering={enter(0)} style={styles.intro}>
+          <AppText variant="title" accessibilityRole="header">
+            {"누구와 함께\n떠날까요?"}
           </AppText>
-          <View style={styles.dates} accessible accessibilityLabel={`여행 날짜 ${dateLine}`}>
-            <Icons.Calendar18 width={18} height={18} />
-            <AppText variant="caption" color="darkgreen">
-              {dateLine}
+          <AppText variant="body" color="muted">
+            {"친구를 초대하면 서로의 취향을 반영해\n여행을 함께 준비할 수 있어요."}
+          </AppText>
+        </Animated.View>
+
+        <Animated.View entering={enter(1)}>
+          <TripSummaryCard title={tripTitle} startDate={trip.startDate} endDate={trip.endDate} />
+        </Animated.View>
+
+        {shared ? (
+          <Animated.View entering={FadeInDown.springify().damping(motion.spring.gentle.damping)} layout={LinearTransition.springify()} style={styles.sharedBanner} accessibilityRole="alert">
+            <AppText variant="label" color="blue">
+              ✓ 초대 링크를 공유했어요
             </AppText>
-          </View>
+            <AppText variant="small12" color="muted">
+              친구가 참여하면 아래 목록에서 확인할 수 있어요.
+            </AppText>
+          </Animated.View>
+        ) : null}
+
+        <Animated.View entering={enter(2)} layout={LinearTransition.springify()} style={styles.linkBlock}>
+          <InviteCard link={link} status={linkStatus} onCopy={() => void copyLink()} onShare={() => void shareLink()} onRetry={() => void inviteLink.refetch()} />
+          <AppText variant="small12" color="blue">
+            초대 링크를 친구에게 보내주세요.
+          </AppText>
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(motion.stagger).springify()}>
-          <InviteCard
-            link={link}
-            status={linkStatus}
-            onCopy={() => void copyLink()}
-            onShare={() => void shareLink()}
-            onRetry={() => void inviteLink.refetch()}
-          />
-        </Animated.View>
-
-        <Animated.View entering={FadeInDown.delay(2 * motion.stagger).springify()} style={styles.travelers}>
+        <Animated.View entering={enter(3)} layout={LinearTransition.springify()} style={styles.travelers}>
           <View style={styles.travelersHeader}>
-            <AppText variant="label" accessibilityRole="header">
+            <AppText variant="taskTitle" accessibilityRole="header">
               {travelers.isSuccess ? `함께하는 여행자  ${participants.length}` : "함께하는 여행자"}
             </AppText>
             <PressableScale onPress={() => sheetRef.current?.present()} style={styles.fromFriends} accessibilityRole="button" accessibilityHint="친구 목록을 열어 초대할 친구를 골라요">
@@ -254,7 +296,7 @@ export default function TripInviteScreen() {
                 />
               ))}
               {alone ? (
-                <AppText variant="small12" color="muted" style={styles.emptyHint}>
+                <AppText variant="small12" color="muted">
                   아직 초대한 친구가 없어요. 링크를 보내거나 친구 목록에서 골라 보세요.
                 </AppText>
               ) : null}
@@ -262,14 +304,18 @@ export default function TripInviteScreen() {
           )}
         </Animated.View>
 
-        <Animated.View entering={FadeInDown.delay(3 * motion.stagger).springify()}>
-          <SharedPreferenceHint />
+        <Animated.View entering={enter(4)} layout={LinearTransition.springify()} style={styles.firstCourse}>
+          <AppText variant="label" color="darkgreen">{`첫 코스는 ${creatorName}님의 성향으로`}</AppText>
+          <AppText variant="small13" color="darkgreen">
+            {"친구의 취향은 참여 후 장소를 추가하거나\n제외하는 과정에서 함께 반영해요."}
+          </AppText>
         </Animated.View>
       </ScrollView>
 
-      <BottomCTA helper={alone ? "혼자 여행할게요" : undefined} onHelperPress={alone ? finish : undefined}>
+      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 12) + 12 }]}>
         <Button label="친구 초대 완료" onPress={finish} rightIcon={<Icons.ArrowRight width={20} height={20} />} />
-      </BottomCTA>
+        <Button label="혼자 여행할게요" variant="secondary" height={48} onPress={finish} accessibilityHint="친구 없이 코스 만들기로 넘어가요" />
+      </View>
 
       <FriendPickerSheet
         sheetRef={sheetRef}
@@ -284,14 +330,16 @@ export default function TripInviteScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: screenPadding, paddingTop: space[16], paddingBottom: space[24], gap: space[16] },
-  intro: { gap: space[4] },
-  dates: { flexDirection: "row", alignItems: "center", gap: space[8], minHeight: 32, marginTop: space[4] },
-  travelers: { gap: space[4] },
+  content: { paddingHorizontal: screenPadding, paddingTop: space[24], paddingBottom: space[24], gap: space[16] },
+  intro: { gap: space[8], marginBottom: space[8] },
+  sharedBanner: { borderRadius: radius.lg, backgroundColor: colors.paleblue, padding: space[16], gap: space[4] },
+  linkBlock: { gap: space[12] },
+  travelers: { gap: space[4], marginTop: space[8] },
   travelersHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: sizes.touchTarget },
   fromFriends: { height: sizes.touchTarget, justifyContent: "center", paddingLeft: space[12] },
-  rows: { gap: space[12] },
+  rows: { gap: space[8] },
   skeletonRow: { flexDirection: "row", alignItems: "center", gap: space[12], minHeight: 60 },
   skeletonTexts: { flex: 1, gap: space[8] },
-  emptyHint: { marginTop: space[4] },
+  firstCourse: { borderRadius: radius.lg, backgroundColor: colors.mint, padding: space[16], gap: space[8] },
+  actions: { paddingTop: space[12], paddingHorizontal: screenPadding, gap: space[12], backgroundColor: colors.white },
 });

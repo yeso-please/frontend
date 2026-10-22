@@ -1,6 +1,6 @@
-
 import type { DateRange, TripConflict } from "@/api/types";
 import { addDays, diffDays, parseYmd, toYmd } from "@/lib/date";
+import { shortRegionName } from "@/lib/josa";
 
 // 여행 준비 흐름에서만 쓰는 날짜·라우트 도우미. 날짜는 모두 "YYYY-MM-DD" 문자열입니다.
 
@@ -78,3 +78,32 @@ export function conflictsFromDetails(details: Record<string, unknown> | undefine
 
 /** 긴 문장을 앞부분만 보여줍니다 ("자연을 매우 선호, 체험 활동을…") */
 export const truncate = (text: string, max: number) => (text.length > max ? `${text.slice(0, max).trimEnd()}…` : text);
+
+/** 서버의 regionName("강원특별자치도 강릉시") → 화면용 짧은 이름("강릉"). 지역 전이면 null */
+export function regionLabelFromName(regionName: string | null | undefined): string | null {
+  const words = regionName?.trim().split(/\s+/).filter(Boolean) ?? [];
+  if (words.length === 0) return null;
+  if (words.length === 1) return shortRegionName("", words[0]);
+  return shortRegionName(words[0], words.slice(1).join(" "));
+}
+
+/** 여행 카드 제목 "강릉 여행". 지역 전이면 서버가 준 대체 제목("10월 10일부터 2박 3일 여행") */
+export const tripCardTitle = (regionName: string | null | undefined, fallbackTitle: string) => {
+  const label = regionLabelFromName(regionName);
+  return label ? `${label} 여행` : fallbackTitle;
+};
+
+/** 닉네임 목록 → "수정 · 서현" (많으면 "수정 · 서현 외 2명") */
+export function joinNicknames(nicknames: string[], max = 3) {
+  if (nicknames.length <= max) return nicknames.join(" · ");
+  return `${nicknames.slice(0, max).join(" · ")} 외 ${nicknames.length - max}명`;
+}
+
+/** "10.17 – 10.19" (요일 없이, 홈 카드용). 당일이면 "10.17" */
+export function formatDotRange(start: string, end: string) {
+  const dot = (ymd: string) => {
+    const d = parseYmd(ymd);
+    return `${d.getMonth() + 1}.${d.getDate()}`;
+  };
+  return start === end ? dot(start) : `${dot(start)} – ${dot(end)}`;
+}

@@ -1,27 +1,50 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, type Href } from "expo-router";
-import { useState, type ReactNode } from "react";
-import { Alert, ScrollView, StyleSheet, View } from "react-native";
+import { useState } from "react";
+import { Alert, RefreshControl, ScrollView, Share, StyleSheet, View } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
+import { toast } from "sonner-native";
 
-import { USE_MOCK } from "@/api/config";
-import { authApi, onboardingApi } from "@/api/endpoints";
+import { LINK_BASE_URL, USE_MOCK } from "@/api/config";
+import { authApi, friendApi } from "@/api/endpoints";
+import { errorMessage } from "@/api/errors";
 import { resetMockDb } from "@/api/mock/server";
 import { queryKeys } from "@/api/queryKeys";
-import { Icons } from "@/components/icons";
-import { AppText, PressableScale, Screen } from "@/components/ui";
-import { MbtiSummaryCard } from "@/features/mbti";
+import { AppText, Button, PressableScale, Screen } from "@/components/ui";
+import { PersonaCard, useMyPersona } from "@/features/home/PersonaCard";
+import { MBTI_PROFILES } from "@/features/mbti/profiles";
+import { Skeleton } from "@/features/trip/components/Skeleton";
 import { useAuthStore } from "@/store/auth";
 import { colors, motion, radius, screenPadding, sizes, space } from "@/theme";
 
 const enter = (i: number) => FadeInDown.delay(motion.stagger * i).springify().damping(motion.spring.gentle.damping);
+/** 친구 아바타는 네 명까지 보여 주고 나머지는 "···" */
+const MAX_FRIEND_AVATARS = 4;
 
-/** MY 탭 — 디자인 없음. 디자이너 메모 "MY → 친구 설정, 프로필, mbti 검사"에 맞춰 토큰만 맞춘 기본 화면입니다. */
+/** 초안 M1 · MY 메인 — 프로필, 나의 여행 성향, 함께 떠나는 친구, 메뉴 */
 export default function MyScreen() {
   const queryClient = useQueryClient();
   const user = useAuthStore((s) => s.user);
-  const tasteQuery = useQuery({ queryKey: queryKeys.myOnboarding, queryFn: onboardingApi.me });
+  const persona = useMyPersona();
+  const friends = useQuery({ queryKey: queryKeys.friends, queryFn: friendApi.list });
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [sharingLink, setSharingLink] = useState(false);
+
+  /** 2-4 친구 초대 링크를 새로 받아 공유합니다 (원문 토큰은 발급 응답에서만 받을 수 있어요) */
+  const shareFriendLink = async () => {
+    if (sharingLink) return;
+    setSharingLink(true);
+    try {
+      const link = await friendApi.issueLink();
+      await Share.share({ message: `${user?.nickname ?? "친구"}님이 TriPin 친구 초대를 보냈어요. 친구가 되면 여행에 바로 초대할 수 있어요.
+${LINK_BASE_URL}friend/${link.token}` });
+    } catch (e) {
+      toast(errorMessage(e));
+    } finally {
+      setSharingLink(false);
+    }
+  };
 
   const signOut = async (before?: () => Promise<void>) => {
     if (busy) return;
@@ -46,145 +69,147 @@ export default function MyScreen() {
       { text: "초기화", style: "destructive", onPress: () => signOut(resetMockDb) },
     ]);
 
+  const refresh = async () => {
+    setRefreshing(true);
+    await Promise.allSettled([queryClient.invalidateQueries({ queryKey: queryKeys.friends }), queryClient.invalidateQueries({ queryKey: queryKeys.myOnboarding })]);
+    setRefreshing(false);
+  };
+
   const nickname = user?.nickname ?? "여행자";
-  const profileText = tasteQuery.data?.submission?.profileText;
+  // 카카오로 가입한 소셜 전용 회원은 email이 없습니다.
+  const bio = persona.type ? MBTI_PROFILES[persona.type].oneLiner : (user?.email ?? "카카오 계정으로 로그인 중");
+  const friendList = friends.data ?? [];
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Animated.View entering={enter(0)} style={styles.header}>
-          <AppText variant="title" accessibilityRole="header">
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} colors={[colors.green]} />}
+      >
+        <View style={styles.header}>
+          <AppText variant="label" accessibilityRole="header">
             MY
           </AppText>
-        </Animated.View>
+        </View>
 
-        <Animated.View entering={enter(1)} style={styles.profile}>
+        <Animated.View entering={enter(0)} style={styles.profile}>
           <View style={styles.avatar}>
             <AppText variant="cardTitle" color="darkgreen">
-              {nickname.slice(0, 1)}
+              {Array.from(nickname.trim())[0] ?? "?"}
             </AppText>
           </View>
           <View style={styles.profileTexts}>
-            <AppText variant="cardTitle" numberOfLines={1}>
-              {`${nickname}님`}
+            <AppText variant="title" numberOfLines={1}>
+              {nickname}
             </AppText>
-            {/* 카카오로 가입한 소셜 전용 회원은 email이 없습니다 */}
-            <AppText variant="small13" color="muted" numberOfLines={1}>
-              {user?.email ?? "카카오 계정으로 로그인 중"}
+            <AppText variant="small12" color="muted" numberOfLines={2}>
+              {bio}
             </AppText>
           </View>
+        </Animated.View>
+
+        <Animated.View entering={enter(1)}>
+          <PersonaCard variant="my" />
         </Animated.View>
 
         <Animated.View entering={enter(2)} style={styles.section}>
-          <SectionTitle>여행 MBTI</SectionTitle>
-          <MbtiSummaryCard />
-        </Animated.View>
-
-        <Animated.View entering={enter(3)} style={styles.section}>
-          <SectionTitle>여행 취향</SectionTitle>
-          <View style={styles.group}>
-            {profileText ? (
-              <View style={styles.taste}>
-                <AppText variant="small12" color="muted">
-                  지금 반영된 취향
+          <AppText variant="cardTitle" accessibilityRole="header">
+            함께 떠나는 친구
+          </AppText>
+          <View style={styles.friendsCard}>
+            {friends.isPending ? (
+              <>
+                <Skeleton width="30%" height={18} />
+                <Skeleton width="70%" height={44} rounded={22} />
+              </>
+            ) : friends.isError ? (
+              <View style={styles.friendsError}>
+                <AppText variant="small13" color="muted">
+                  친구 목록을 불러오지 못했어요.
                 </AppText>
-                <AppText variant="bodyMedium15" color="darkgreen">
-                  {profileText}
-                </AppText>
+                <Button label="다시 시도" variant="neutral" height={40} onPress={() => void friends.refetch()} />
               </View>
-            ) : null}
-            <Row label="여행 취향 다시 설정" description="여행 스타일·동기·좋아한 지역과 여행 MBTI를 다시 골라요" href="/my/taste" />
+            ) : (
+              <>
+                <AppText variant="label">{`친구 ${friendList.length}명`}</AppText>
+                {friendList.length === 0 ? (
+                  <AppText variant="small13" color="muted">
+                    친구 초대 링크를 수락한 친구가 여기에 모여요. 친구가 되면 여행에 바로 초대할 수 있어요.
+                  </AppText>
+                ) : (
+                  <View style={styles.friendAvatars} accessible accessibilityLabel={`친구 ${friendList.map((f) => f.nickname).join(", ")}`}>
+                    {friendList.slice(0, MAX_FRIEND_AVATARS).map((f, i) => (
+                      <View key={f.userId} style={[styles.friendAvatar, i % 2 === 0 ? styles.friendMint : styles.friendBlue]}>
+                        <AppText variant="label" color={i % 2 === 0 ? "darkgreen" : "blue"}>
+                          {Array.from(f.nickname.trim())[0] ?? "?"}
+                        </AppText>
+                      </View>
+                    ))}
+                    {friendList.length > MAX_FRIEND_AVATARS ? (
+                      <AppText variant="label" color="muted" style={styles.moreFriends}>
+                        ···
+                      </AppText>
+                    ) : null}
+                  </View>
+                )}
+                <Button label="친구 목록 보기" variant="secondary" height={48} onPress={() => router.push("/my/friends")} />
+              </>
+            )}
           </View>
         </Animated.View>
 
-        <Animated.View entering={enter(4)} style={styles.section}>
-          <SectionTitle>계정</SectionTitle>
-          <View style={styles.group}>
-            <Row label="친구 관리 (준비 중)" disabled />
-            <Divider />
-            <Row label="로그아웃" onPress={confirmLogout} disabled={busy} />
-          </View>
+        <Animated.View entering={enter(3)} style={styles.menu}>
+          <MenuRow label="내 여행" hint="다가오는 여행과 지난 여행을 모두 봐요" href="/my/trips" />
+          <MenuRow label="친구 관리" hint="친구 목록에서 친구를 찾거나 끊어요" href="/my/friends" />
+          <MenuRow label="친구 초대 링크 보내기" hint="링크를 받은 친구가 수락하면 바로 친구가 돼요" onPress={() => void shareFriendLink()} disabled={sharingLink} />
+          <MenuRow label="로그아웃" onPress={confirmLogout} disabled={busy} />
+          {USE_MOCK ? <MenuRow label="목업 데이터 초기화" hint="EXPO_PUBLIC_API_MOCK=true 일 때만 보여요" onPress={confirmReset} disabled={busy} danger /> : null}
         </Animated.View>
-
-        {USE_MOCK ? (
-          <Animated.View entering={enter(5)} style={styles.section}>
-            <SectionTitle>개발용</SectionTitle>
-            <View style={styles.group}>
-              <Row label="목업 데이터 초기화" description="EXPO_PUBLIC_API_MOCK=true 일 때만 보여요" onPress={confirmReset} disabled={busy} danger />
-            </View>
-          </Animated.View>
-        ) : null}
       </ScrollView>
     </Screen>
   );
 }
 
-function SectionTitle({ children }: { children: ReactNode }) {
-  return (
-    <AppText variant="caption" color="muted" style={styles.sectionTitle} accessibilityRole="header">
-      {children}
-    </AppText>
-  );
-}
+type MenuRowProps = { label: string; hint?: string; href?: Href; onPress?: () => void; disabled?: boolean; danger?: boolean };
 
-function Divider() {
-  return <View style={styles.divider} />;
-}
-
-type RowProps = {
-  label: string;
-  description?: string;
-  href?: Href;
-  onPress?: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-};
-
-function Row({ label, description, href, onPress, disabled, danger }: RowProps) {
-  const handlePress = () => {
-    if (href) router.push(href);
-    else onPress?.();
-  };
+/** 초안 M1 하단 메뉴 — "프로필 편집 ›" 같은 글자 행 */
+function MenuRow({ label, hint, href, onPress, disabled, danger }: MenuRowProps) {
   return (
     <PressableScale
-      onPress={handlePress}
+      onPress={() => (href ? router.push(href) : onPress?.())}
       disabled={disabled}
       haptic={disabled ? false : "tap"}
       scaleTo={0.98}
-      style={[styles.row, disabled && styles.rowDisabled]}
+      style={[styles.menuRow, disabled && styles.menuDisabled]}
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityHint={description}
+      accessibilityHint={hint}
       accessibilityState={{ disabled: !!disabled }}
     >
-      <View style={styles.rowTexts}>
-        <AppText variant="bodyMedium15" style={danger ? styles.danger : undefined} color={disabled ? "muted" : "charcoal"}>
-          {label}
-        </AppText>
-        {description ? (
-          <AppText variant="small12" color="muted">
-            {description}
-          </AppText>
-        ) : null}
-      </View>
-      {!disabled && href ? <Icons.ChevronRight width={16} height={16} /> : null}
+      <AppText variant="small13" color={danger ? undefined : "charcoal"} style={danger ? styles.danger : undefined}>
+        {`${label} ›`}
+      </AppText>
     </PressableScale>
   );
 }
 
 const styles = StyleSheet.create({
   content: { paddingHorizontal: screenPadding, paddingBottom: space[32], gap: space[24] },
-  header: { height: sizes.appBar + 8, justifyContent: "flex-end" },
+  header: { height: sizes.appBar, justifyContent: "center" },
   profile: { flexDirection: "row", alignItems: "center", gap: space[16] },
-  avatar: { width: 56, height: 56, borderRadius: radius.pill, backgroundColor: colors.mint, alignItems: "center", justifyContent: "center" },
+  avatar: { width: 64, height: 64, borderRadius: radius.pill, backgroundColor: colors.mint, alignItems: "center", justifyContent: "center" },
   profileTexts: { flex: 1, gap: 2 },
-  section: { gap: space[8] },
-  sectionTitle: { paddingHorizontal: space[4] },
-  group: { borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.white, overflow: "hidden" },
-  taste: { backgroundColor: colors.mint, paddingHorizontal: space[16], paddingVertical: space[12], gap: 2 },
-  row: { minHeight: 56, paddingHorizontal: space[16], paddingVertical: space[8], flexDirection: "row", alignItems: "center", gap: space[12] },
-  rowDisabled: { opacity: 0.6 },
-  rowTexts: { flex: 1, gap: 2 },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginHorizontal: space[16] },
+  section: { gap: space[16] },
+  friendsCard: { borderRadius: 20, backgroundColor: colors.surface, padding: space[16], gap: space[16] },
+  friendsError: { gap: space[8] },
+  friendAvatars: { flexDirection: "row", alignItems: "center", gap: space[12] },
+  friendAvatar: { width: 44, height: 44, borderRadius: 22, alignItems: "center", justifyContent: "center" },
+  friendMint: { backgroundColor: colors.mint },
+  friendBlue: { backgroundColor: colors.paleblue },
+  moreFriends: { letterSpacing: 2 },
+  menu: { gap: space[4] },
+  menuRow: { minHeight: 48, justifyContent: "center" },
+  menuDisabled: { opacity: 0.5 },
   danger: { color: colors.danger },
 });
