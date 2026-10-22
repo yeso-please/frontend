@@ -1,13 +1,22 @@
 import { api } from "./client";
 import type {
+  Alternatives,
+  AttractionCategory,
   AuthResponse,
   ContextCheck,
+  ContextCheckRequest,
+  Course,
+  CourseRoutes,
   CreateTripRequest,
   DateRange,
   DecideRegionRequest,
   DecideRegionResponse,
+  DrawRequest,
+  DrawResult,
   Friend,
+  FriendLinkPreview,
   FriendInvite,
+  GenerateCourseRequest,
   InvitePreview,
   IssuedLink,
   LinkSummary,
@@ -17,9 +26,19 @@ import type {
   OnboardingSubmission,
   OnboardingSubmissionRequest,
   Participant,
+  Preferences,
+  Presence,
+  ReceivedInvite,
   RegionCard,
   RegionList,
+  RegionMatch,
+  RestaurantRecommendations,
+  RestaurantSearch,
   ScheduleDensity,
+  ScheduleOperation,
+  SentFriendInvite,
+  TasteMode,
+  Transport,
   TripContext,
   TripSummary,
 } from "./types";
@@ -39,34 +58,79 @@ export const onboardingApi = {
   me: () => api.get<MyOnboarding>("/onboarding/me"),
 };
 
+export const preferencesApi = {
+  get: () => api.get<Preferences>("/me/preferences"),
+  update: (courseTasteMode: TasteMode) => api.patch<Preferences>("/me/preferences", { courseTasteMode }),
+};
+
 export const regionApi = {
-  /** days를 빼면 추첨 가능 여부 없이 목록만 (온보딩용) */
+  /** days를 빼면 추첨 가능 여부 없이 목록만 */
   list: (params?: { days?: number; scheduleDensity?: ScheduleDensity }) => api.get<RegionList>("/regions", { query: params }),
   card: (sigCd: string) => api.get<RegionCard>(`/regions/${sigCd}/card`),
+  /** 7-5 지역 먼저 뽑기 — 저장하지 않습니다. 결과 regionSelection을 여행 만들기에 그대로 보냅니다 */
+  draw: (body: DrawRequest) => api.post<DrawResult>("/regions/draw", body),
+  /** 7-6 성향 맞춤 지역 문장 (닉네임은 화면이 앞에 붙입니다) */
+  match: (sigCd: string) => api.get<RegionMatch>(`/regions/${sigCd}/match`),
 };
 
 export const tripApi = {
   unavailableDates: (from: string, to: string) => api.get<DateRange[]>("/trips/unavailable-dates", { query: { from, to } }),
-  check: (body: { startDate: string; nights: number }) => api.post<ContextCheck>("/trips/context/check", body),
+  check: (body: ContextCheckRequest) => api.post<ContextCheck>("/trips/context/check", body),
   create: (body: CreateTripRequest) => api.post<TripContext>("/trips", body),
   list: (period?: "UPCOMING" | "PAST") => api.get<TripSummary[]>("/trips", { query: { period } }),
   context: (tripId: number) => api.get<TripContext>(`/trips/${tripId}/context`),
+  updateContext: (tripId: number, body: { transport?: Transport; originLat?: number | null; originLng?: number | null; version: number }) =>
+    api.patch<TripContext>(`/trips/${tripId}/context`, body),
   decideRegion: (tripId: number, body: DecideRegionRequest) => api.post<DecideRegionResponse>(`/trips/${tripId}/region`, body),
   participants: (tripId: number) => api.get<Participant[]>(`/trips/${tripId}/participants`),
   leave: (tripId: number) => api.delete(`/trips/${tripId}/participants/me`),
+  /** 3-10 관리자만 */
+  kick: (tripId: number, userId: number) => api.delete(`/trips/${tripId}/participants/${userId}`),
+  /** 3-11 "보고 있어요" 신호 — 20초마다 */
+  heartbeat: (tripId: number) => api.post<void>(`/trips/${tripId}/presence`),
+  presence: (tripId: number) => api.get<Presence>(`/trips/${tripId}/presence`),
 };
 
 export const inviteApi = {
   issue: (tripId: number, expiresInDays = 7) => api.post<IssuedLink>(`/trips/${tripId}/invites`, { expiresInDays }),
   list: (tripId: number) => api.get<LinkSummary[]>(`/trips/${tripId}/invites`),
   preview: (token: string) => api.get<InvitePreview>(`/invites/${token}`, { auth: false }),
+  /** 4-16 수락 전 코스 둘러보기 (로그인 불필요, 읽기 전용) */
+  course: (token: string) => api.get<Course>(`/invites/${token}/course`, { auth: false }),
   accept: (token: string) => api.post<TripContext>(`/invites/${token}/accept`),
   inviteFriend: (tripId: number, friendUserId: number) => api.post<FriendInvite>(`/trips/${tripId}/friend-invites`, { friendUserId }),
-  friendInvites: (tripId: number) => api.get<FriendInvite[]>(`/trips/${tripId}/friend-invites`),
+  friendInvites: (tripId: number) => api.get<SentFriendInvite[]>(`/trips/${tripId}/friend-invites`),
   cancelFriendInvite: (tripId: number, inviteId: number) => api.delete(`/trips/${tripId}/friend-invites/${inviteId}`),
+  /** 4-7 받은 초대 — 알림 벨 숫자 */
+  received: () => api.get<ReceivedInvite[]>("/me/trip-invites"),
+  acceptReceived: (id: number) => api.post<TripContext>(`/me/trip-invites/${id}/accept`),
+  declineReceived: (id: number) => api.post<void>(`/me/trip-invites/${id}/decline`),
+};
+
+export const courseApi = {
+  /** 5-1 최초 생성은 여행을 만든 사람만(COURSE_CREATOR_ONLY). AI 문장 때문에 수 초 걸립니다 */
+  generate: (tripId: number, body: GenerateCourseRequest) => api.post<Course>(`/courses/${tripId}/generate`, body, { timeoutMs: 60000 }),
+  get: (tripId: number) => api.get<Course>(`/courses/${tripId}`),
+  /** 5-3 전부 적용되거나 전부 거부 */
+  edit: (tripId: number, version: number, operations: ScheduleOperation[]) =>
+    api.patch<Course>(`/courses/${tripId}/schedule`, { version, operations }),
+  alternatives: (tripId: number, params: { itemId?: string; category?: AttractionCategory; limit?: number; q?: string }) =>
+    api.get<Alternatives>(`/courses/${tripId}/alternatives`, { query: params }),
+  restaurantRecommendations: (tripId: number, itemId: string, radius?: number) =>
+    api.get<RestaurantRecommendations>(`/courses/${tripId}/restaurants/recommendations`, { query: { itemId, radius } }),
+  restaurantSearch: (tripId: number, params: { itemId: string; query?: string; radius?: number; page?: number }) =>
+    api.get<RestaurantSearch>(`/courses/${tripId}/restaurants/search`, { query: params }),
+  /** 5-7 지도 경로 — 수단을 바꿔 부를 수 있습니다 */
+  routes: (tripId: number, dayIndex: number, transport?: Transport) =>
+    api.get<CourseRoutes>(`/courses/${tripId}/routes`, { query: { dayIndex, transport }, timeoutMs: 30000 }),
 };
 
 export const friendApi = {
   list: () => api.get<Friend[]>("/friends"),
   issueLink: (expiresInDays = 7) => api.post<IssuedLink>("/friend-links", { expiresInDays }),
+  /** 2-7 공개 — 링크를 보낸 사람 닉네임 */
+  previewLink: (token: string) => api.get<FriendLinkPreview>(`/friend-links/by-token/${token}`, { auth: false }),
+  /** 2-8 수락하면 바로 친구가 됩니다 (이미 친구면 200, 같은 응답) */
+  acceptLink: (token: string) => api.post<Friend>(`/friend-links/by-token/${token}/accept`),
+  remove: (userId: number) => api.delete(`/friends/${userId}`),
 };

@@ -1,9 +1,14 @@
-// docs/frontend-api-guide.md (백엔드 docs/api/ 기준)의 응답 모양. 필드가 바뀌면 백엔드 명세를 먼저 확인합니다.
+// 백엔드 docs/api/ (auth·profile·trip·attraction) 기준 응답 모양. 필드가 바뀌면 백엔드 명세를 먼저 확인합니다.
+// 화면별로 어떤 API를 부르는지는 백엔드 docs/frontend-guide.md (확정 디자인 489:4621) 를 따릅니다.
 
 export type ScheduleDensity = "RELAXED" | "PACKED";
 export type Transport = "WALK" | "CAR" | "PUBLIC_TRANSIT";
 export type RegionSelection = "RANDOM" | "CONDITIONAL" | "MANUAL";
+export type DrawCondition = "DISTANCE" | "MY_TASTE";
 export type TasteStatus = "READY" | "PENDING" | "FAILED";
+export type TasteMode = "TASTE" | "RANDOM";
+export type TextSource = "RULE" | "LLM";
+export type UserRef = { userId: number; nickname: string };
 
 // ── 인증 ──
 /** 카카오로 가입한 소셜 전용 회원은 email이 null입니다 */
@@ -47,13 +52,15 @@ export type OnboardingSubmissionRequest = {
   travelStyles: Record<string, number>;
   travelMotives: number[];
   likedRegions: string[];
-  scheduleDensity: ScheduleDensity;
+  /** v2는 보내지 않습니다 — 서버가 MBTI J → PACKED, P → RELAXED로 정합니다 (D3-2) */
+  scheduleDensity?: ScheduleDensity;
   excludeTags: string[];
   /** v2면 필수: 키 "1"~"12", 값 1 또는 2 */
   mbtiAnswers?: Record<string, 1 | 2>;
 };
 // 응답에는 excludeTags·mbtiAnswers가 없습니다 (백엔드 OnboardingSubmissionResponse 기준).
-export type OnboardingSubmission = Omit<OnboardingSubmissionRequest, "excludeTags" | "mbtiAnswers"> & {
+export type OnboardingSubmission = Omit<OnboardingSubmissionRequest, "excludeTags" | "mbtiAnswers" | "scheduleDensity"> & {
+  scheduleDensity: ScheduleDensity;
   excludeTags?: string[];
   /** v2면 서버가 계산한 4글자 MBTI, v1이면 null. 표시용이며 추천에는 쓰이지 않습니다 */
   mbtiCode: string | null;
@@ -64,6 +71,7 @@ export type OnboardingSubmission = Omit<OnboardingSubmissionRequest, "excludeTag
   createdAt: string;
 };
 export type MyOnboarding = { onboardingCompleted: boolean; submission: OnboardingSubmission | null };
+export type Preferences = { courseTasteMode: TasteMode };
 
 // ── 지역 ──
 export type Region = {
@@ -82,18 +90,65 @@ export type RegionList = {
   eligibleCount: number | null;
   regions: Region[];
 };
+export type HeroImage = {
+  url: string;
+  sourceName: string | null;
+  sourceUrl: string | null;
+  license: string | null;
+  /** 지역 대표 사진(공공누리)일 때 촬영자 — 출처 표시에 함께 씁니다 */
+  photographer: string | null;
+  /** 대표 관광지 사진으로 채웠을 때 그 관광지 */
+  attractionId: number | null;
+};
+export type Landmark = { attractionId: number; name: string; thumbnailUrl: string | null; oneLine: string | null };
 export type RegionCard = {
   sigCd: string;
   province: string;
   city: string;
   title: string;
+  /** 사람이 승인한 한 줄 소개(30자 이내). 없으면 null */
+  tagline: string | null;
+  /** 승인된 태그 0~4개 ("#" 없이) */
+  tags: string[];
   introduction: string[];
-  heroImage: { url: string; sourceName: string; sourceUrl: string; license: string | null } | null;
+  heroImage: HeroImage | null;
   characteristics: string[];
   historyHighlights: string[];
-  landmarks: { attractionId: number; name: string; thumbnailUrl: string | null }[];
+  /** B4 "만나볼 순간" — 최대 3곳 */
+  landmarks: Landmark[];
   sources: { name: string; url: string }[];
   updatedAt: string | null;
+};
+export type DrawRequest = {
+  mode: "RANDOM" | "CONDITIONAL";
+  conditions?: DrawCondition[];
+  originLat?: number;
+  originLng?: number;
+  scheduleDensity?: ScheduleDensity | null;
+};
+export type DrawResult = {
+  sigCd: string;
+  province: string;
+  city: string;
+  lat: number;
+  lng: number;
+  regionSelection: "RANDOM" | "CONDITIONAL";
+  scheduleDensity: ScheduleDensity;
+  /** 이 지역·밀도로 코스를 만들 수 있는 최대 박수(0~6) */
+  maxNights: number;
+  appliedConditions: DrawCondition[];
+  ignoredConditions: { condition: DrawCondition; reason: string }[];
+  candidateCount: number;
+  warnings: string[];
+};
+/** 7-6 성향 맞춤 지역 문장. 설문 v1·설문 전이면 mbtiCode·personaName·text가 null */
+export type RegionMatch = {
+  sigCd: string;
+  mbtiCode: string | null;
+  personaName: string | null;
+  text: string | null;
+  textSource: TextSource | null;
+  aiGenerated: boolean;
 };
 
 // ── 여행 ──
@@ -109,28 +164,49 @@ export type TripContext = {
   regionSelection: RegionSelection | null;
   scheduleDensity: ScheduleDensity | null;
   hasCourse: boolean;
+  retroactive: boolean;
   version: number;
 };
 export type DateRange = { tripId: number; startDate: string; endDate: string };
 export type TripConflict = DateRange & { title: string };
-export type ContextCheck = { available: boolean; endDate: string; conflicts: TripConflict[]; eligibleRegionCount: number };
-export type CreateTripRequest = { startDate: string; nights: number; transport: Transport; originLat?: number; originLng?: number };
+export type ContextCheckRequest = { startDate: string; nights: number; sigCd?: string; scheduleDensity?: ScheduleDensity | null };
+export type ContextCheck = {
+  available: boolean;
+  endDate: string;
+  conflicts: TripConflict[];
+  eligibleRegionCount: number;
+  /** 요청에 sigCd가 없으면 null. false면 이 기간엔 그 지역으로 코스를 만들 수 없습니다 */
+  regionEligible: boolean | null;
+};
+/** transport는 보내지 않으면 서버 기본 CAR (D2) */
+export type CreateTripRequest = {
+  startDate: string;
+  nights: number;
+  regionSigCd?: string;
+  regionSelection?: RegionSelection;
+  transport?: Transport;
+  originLat?: number;
+  originLng?: number;
+  scheduleDensity?: ScheduleDensity;
+};
 export type TripSummary = {
   tripId: number;
+  /** 코스 제목, 없으면 서버 대체 제목 ("10월 10일부터 2박 3일 여행") */
   title: string;
   regionSigCd: string | null;
   regionName: string | null;
   startDate: string;
   endDate: string;
   nights: number;
-  participants: { userId: number; nickname: string }[];
+  participants: UserRef[];
   hasCourse: boolean;
+  retroactive: boolean;
   myDiaryId: number | null;
   updatedAt: string;
 };
 export type DecideRegionRequest = {
   mode: RegionSelection;
-  conditions?: ("DISTANCE" | "MY_TASTE")[];
+  conditions?: DrawCondition[];
   sigCd?: string | null;
   scheduleDensity?: ScheduleDensity;
   replaceCourse?: boolean;
@@ -149,29 +225,242 @@ export type DecideRegionResponse = {
   warnings: string[];
   version: number;
 };
-export type Participant = { userId: number; nickname: string; isCreator: boolean; joinedAt: string };
+export type Participant = {
+  userId: number;
+  nickname: string;
+  isCreator: boolean;
+  /** 참여자를 내보낼 수 있는 사람(3-10) — 만든 사람, 나갔으면 가장 먼저 들어온 참여자 */
+  isManager: boolean;
+  joinedAt: string;
+};
+export type Presence = {
+  heartbeatSeconds: number;
+  activeWindowSeconds: number;
+  /** 최근 신호를 보낸 참여자(나 포함) */
+  participants: (UserRef & { lastSeenAt: string })[];
+};
 
 // ── 초대·친구 ──
 export type IssuedLink = { id: number; token: string; expiresAt: string; createdAt: string };
-export type LinkSummary = { id: number; expiresAt: string; revoked: boolean; createdBy: { userId: number; nickname: string }; createdAt: string };
+export type LinkSummary = { id: number; expiresAt: string; revoked: boolean; createdBy: UserRef; createdAt: string };
 export type InvitePreview = {
   valid: boolean;
   title: string;
   startDate: string;
   endDate: string;
+  regionSigCd: string | null;
   regionName: string | null;
+  heroImageUrl: string | null;
   inviterNickname: string;
   participantCount: number;
+  participants: { nickname: string }[];
+  hasCourse: boolean;
 };
 export type FriendInviteStatus = "PENDING" | "ACCEPTED" | "DECLINED" | "CANCELLED";
 export type FriendInvite = {
   id: number;
   tripId: number;
-  invitee: { userId: number; nickname: string };
+  invitee: UserRef;
   status: FriendInviteStatus;
   createdAt: string;
 };
+/** 4-14 보낸 친구 초대 (누가 보냈든 참여자 모두에게 같은 목록) */
+export type SentFriendInvite = {
+  id: number;
+  invitee: UserRef;
+  inviter: UserRef;
+  status: FriendInviteStatus;
+  createdAt: string;
+};
+/** 4-7 받은 초대 — 알림 벨 숫자 = 배열 길이 (D15) */
+export type ReceivedInvite = {
+  id: number;
+  trip: {
+    tripId: number;
+    title: string;
+    startDate: string;
+    endDate: string;
+    regionName: string | null;
+    heroImageUrl: string | null;
+    participants: { nickname: string }[];
+  };
+  inviter: UserRef;
+  /** true면 수락 버튼을 비활성화합니다 */
+  dateConflict: boolean;
+  createdAt: string;
+};
 export type Friend = { userId: number; nickname: string; since: string };
+/** 2-7 친구 초대 링크 미리보기 (로그인 전에도 누가 보낸 링크인지) */
+export type FriendLinkPreview = { valid: boolean; inviterNickname: string };
+
+// ── 코스 ──
+export type AttractionCategory = "NATURE" | "HISTORY_CULTURE" | "ACTIVITY" | "WALK_REST" | "ETC";
+export type RouteSource = "ROAD" | "ROUTE" | "STRAIGHT";
+/** 앞 지점에서 이 지점까지 세 수단의 이동 (D5). 그날 첫 지점·식당 미정 식사는 null */
+export type TravelLeg = {
+  meters: number;
+  walkMinutes: number;
+  carMinutes: number;
+  transitMinutes: number;
+  carSource: RouteSource;
+  walkSource: RouteSource;
+  transitSource: RouteSource;
+  transitTransfers: number | null;
+  transitFare: number | null;
+  estimated: boolean;
+};
+export type ChangeOrigin = "BASE" | "ADDED" | "REPLACED";
+export type ItemChange = {
+  origin: ChangeOrigin;
+  by: UserRef | null;
+  replacedFrom: { attractionId: number; name: string } | null;
+  note: string | null;
+  changedAt: string | null;
+};
+export type RestaurantProvider = "TOUR_API" | "FARM_RESTAURANT" | "MODEL_RESTAURANT" | "GOOD_PRICE" | "KAKAO";
+export type RestaurantSnapshot = {
+  provider: RestaurantProvider;
+  externalId: string;
+  name: string;
+  category: string | null;
+  address: string | null;
+  roadAddress: string | null;
+  lat: number;
+  lng: number;
+  phone: string | null;
+  placeUrl: string | null;
+  imageUrl: string | null;
+  representativeMenu: string | null;
+  evidenceLabels: string[];
+  sources: { name: string; url: string | null; fetchedAt?: string | null }[];
+};
+type ItemBase = {
+  itemId: string;
+  durationMinutes: number;
+  travelFromPreviousMinutes: number | null;
+  travelFromPreviousMeters: number | null;
+  travelFromPrevious: TravelLeg | null;
+};
+export type AttractionItem = ItemBase & {
+  type: "ATTRACTION";
+  attractionId: number;
+  name: string;
+  category: AttractionCategory;
+  thumbnailUrl: string | null;
+  address: string | null;
+  lat: number;
+  lng: number;
+  estimated: boolean;
+  source: "RECOMMEND" | "MANUAL";
+  reason: string | null;
+  reasonSource: TextSource | null;
+  /** 취향 기준 회원 본인에게만 보이는 AI 이유 */
+  personalReason: string | null;
+  oneLine: string | null;
+  summaryBasis: "SOURCE_SUMMARY" | "NAME_CATEGORY" | null;
+  change: ItemChange;
+};
+export type MealItem = ItemBase & {
+  type: "MEAL";
+  meal: "LUNCH" | "DINNER";
+  /** null이면 "미정" */
+  restaurant: RestaurantSnapshot | null;
+};
+export type CourseItem = AttractionItem | MealItem;
+export type CourseDay = { dayIndex: number; date: string; items: CourseItem[] };
+export type ChangeKind = "ADDED" | "REPLACED" | "REMOVED" | "RESTORED";
+export type CourseChanges = {
+  baselineAt: string;
+  days: { dayIndex: number; added: number; replaced: number; removed: number }[];
+  removed: {
+    removalId: number;
+    attractionId: number;
+    name: string;
+    dayIndex: number;
+    origin: ChangeOrigin;
+    removedBy: UserRef | null;
+    note: string | null;
+    removedAt: string;
+  }[];
+  latest: {
+    type: ChangeKind;
+    dayIndex: number;
+    attractionName: string;
+    replacedFromName: string | null;
+    by: UserRef | null;
+    note: string | null;
+    at: string;
+  } | null;
+};
+export type CourseWarning = { code: string; dayIndex: number | null; itemId: string | null };
+export type RecommendationMode = "PERSONALIZED" | "TOUR_OFFICIAL" | "RULE_BASED" | "RANDOM";
+export type Course = {
+  tripId: number;
+  version: number;
+  myRole: "PARTICIPANT" | "VIEWER";
+  regionSigCd: string | null;
+  regionName: string | null;
+  startDate: string;
+  endDate: string;
+  scheduleDensity: ScheduleDensity | null;
+  title: string | null;
+  titleSource: TextSource | null;
+  intro: string | null;
+  introSource: TextSource | null;
+  aiGenerated: boolean;
+  recommendationMode: RecommendationMode | null;
+  tasteBasis: UserRef | null;
+  days: CourseDay[];
+  warnings: CourseWarning[];
+  changes: CourseChanges | null;
+  updatedBy: UserRef | null;
+  updatedAt: string | null;
+};
+export type GenerateCourseRequest = { version: number; scheduleDensity?: ScheduleDensity; tasteMode?: TasteMode };
+export type ScheduleOperation =
+  | { op: "ADD"; dayIndex: number; position?: number; attractionId: number }
+  | { op: "REPLACE"; itemId: string; attractionId: number; note?: string }
+  | { op: "MOVE"; itemId: string; dayIndex: number; position: number }
+  | { op: "REMOVE"; itemId: string; note?: string }
+  | { op: "RESTORE"; removalId: number; dayIndex?: number; position?: number }
+  | { op: "SET_RESTAURANT"; itemId: string; selectionToken: string }
+  | { op: "CLEAR_RESTAURANT"; itemId: string };
+export type AlternativeItem = {
+  attractionId: number;
+  name: string;
+  category: AttractionCategory;
+  thumbnailUrl: string | null;
+  lat: number;
+  lng: number;
+  estimatedDurationMinutes: number;
+  travelFromPreviousMinutes: number | null;
+  reason: string | null;
+};
+export type Alternatives = {
+  itemId: string | null;
+  groups: { category: AttractionCategory; label: string; items: AlternativeItem[] }[];
+};
+export type RestaurantOrigin = { type: "PREVIOUS_ATTRACTION" | "REGION_CENTER"; attractionId?: number | null; lat: number; lng: number };
+export type RestaurantCandidate = RestaurantSnapshot & { selectionToken: string; distanceMeters: number };
+export type RestaurantRecommendations = {
+  itemId: string;
+  origin: RestaurantOrigin;
+  regionFoodThemes: { name: string; sources: { name: string; url: string }[] }[];
+  sections: { source: RestaurantProvider; label: string; items: RestaurantCandidate[] }[];
+};
+export type RestaurantSearch = { itemId: string; origin: RestaurantOrigin; page: number; isEnd: boolean; items: RestaurantCandidate[] };
+export type RouteLeg = {
+  fromItemId: string;
+  toItemId: string;
+  source: "ROAD" | "WALK" | "TRANSIT" | "STRAIGHT";
+  distanceMeters: number;
+  durationMinutes: number;
+  /** [위도, 경도] 점 목록 */
+  path: [number, number][];
+  transfers: number | null;
+  fare: number | null;
+};
+export type CourseRoutes = { tripId: number; version: number; dayIndex: number; transport: Transport; legs: RouteLeg[] };
 
 // ── 오류 ──
 export type ApiErrorBody = {

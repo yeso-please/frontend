@@ -1,14 +1,26 @@
 // TanStack Query 키. 같은 데이터를 여러 화면이 쓰므로 한 곳에서 관리합니다.
+// "trips" 접두사로 시작하는 키는 여행이 바뀌면 한 번에 무효화합니다.
 export const queryKeys = {
   me: ["me"] as const,
   onboardingQuestions: ["onboarding", "questions"] as const,
   myOnboarding: ["onboarding", "me"] as const,
+  preferences: ["me", "preferences"] as const,
   regions: (days?: number, density?: string) => ["regions", days ?? "all", density ?? "default"] as const,
   regionCard: (sigCd: string) => ["regions", sigCd, "card"] as const,
+  regionMatch: (sigCd: string) => ["regions", sigCd, "match"] as const,
   trips: (period?: string) => ["trips", period ?? "all"] as const,
   tripContext: (tripId: number) => ["trips", tripId, "context"] as const,
   participants: (tripId: number) => ["trips", tripId, "participants"] as const,
   friendInvites: (tripId: number) => ["trips", tripId, "friend-invites"] as const,
+  presence: (tripId: number) => ["trips", tripId, "presence"] as const,
+  course: (tripId: number) => ["trips", tripId, "course"] as const,
+  routes: (tripId: number, dayIndex: number, transport: string) => ["trips", tripId, "course", "routes", dayIndex, transport] as const,
+  alternatives: (tripId: number, itemId: string | null, q?: string) => ["trips", tripId, "course", "alternatives", itemId ?? "add", q ?? ""] as const,
+  restaurants: (tripId: number, itemId: string) => ["trips", tripId, "course", "restaurants", itemId] as const,
   unavailableDates: (from: string, to: string) => ["trips", "unavailable", from, to] as const,
+  receivedInvites: ["me", "trip-invites"] as const,
+  invitePreview: (token: string) => ["invites", token] as const,
+  inviteCourse: (token: string) => ["invites", token, "course"] as const,
   friends: ["friends"] as const,
+  friendLink: (token: string) => ["friend-links", token] as const,
 };

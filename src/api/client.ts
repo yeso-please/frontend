@@ -12,6 +12,8 @@ type RequestOptions = {
   query?: Record<string, string | number | boolean | null | undefined>;
   /** false면 Authorization 헤더를 붙이지 않습니다 (공개 API) */
   auth?: boolean;
+  /** 기본 REQUEST_TIMEOUT_MS보다 오래 걸리는 요청(코스 생성의 AI 문장, 경로 조회) */
+  timeoutMs?: number;
 };
 
 type RawResponse = { status: number; json: unknown };
@@ -25,7 +27,7 @@ const buildPath = (path: string, query?: RequestOptions["query"]) => {
   return qs ? `${path}?${qs}` : path;
 };
 
-async function send(method: Method, path: string, body: unknown, token: string | null): Promise<RawResponse> {
+async function send(method: Method, path: string, body: unknown, token: string | null, timeoutMs = REQUEST_TIMEOUT_MS): Promise<RawResponse> {
   const headers: Record<string, string> = { Accept: "application/json" };
   if (body !== undefined) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
@@ -33,7 +35,7 @@ async function send(method: Method, path: string, body: unknown, token: string |
   if (USE_MOCK) return mockFetch(method, path, body, headers);
 
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     // refresh_token 쿠키를 주고받기 위해 credentials: "include" (Android는 시스템 CookieManager에 저장)
     const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -81,16 +83,16 @@ export function refreshSession(): Promise<AuthResponse> {
   return refreshing;
 }
 
-export async function request<T>(method: Method, path: string, { body, query, auth = true }: RequestOptions = {}): Promise<T> {
+export async function request<T>(method: Method, path: string, { body, query, auth = true, timeoutMs }: RequestOptions = {}): Promise<T> {
   const fullPath = buildPath(path, query);
   const token = auth ? useAuthStore.getState().accessToken : null;
-  let raw = await send(method, fullPath, body, token);
+  let raw = await send(method, fullPath, body, token, timeoutMs);
 
   // access token 만료 → refresh 한 번 후 원래 요청 재시도
   if (auth && raw.status === 401 && (raw.json as ApiErrorBody | null)?.code === "AUTH_UNAUTHENTICATED") {
     try {
       const refreshed = await refreshSession();
-      raw = await send(method, fullPath, body, refreshed.accessToken);
+      raw = await send(method, fullPath, body, refreshed.accessToken, timeoutMs);
     } catch (e) {
       useAuthStore.getState().signOut();
       throw e;
