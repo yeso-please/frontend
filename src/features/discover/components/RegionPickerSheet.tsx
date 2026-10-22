@@ -14,7 +14,6 @@ import { AppText, ErrorView, LoadingView, PressableScale } from "@/components/ui
 import { colors, radius, screenPadding, sizes, space, typography } from "@/theme";
 
 import { type MapRegion, normalizeQuery } from "../lib/regions";
-import { SheetHandle } from "./DestinationSheet";
 
 type Props = {
   ref?: Ref<BottomSheetModal>;
@@ -28,7 +27,16 @@ type Props = {
 
 const SNAP_POINTS = ["88%"];
 
-/** "직접 지역 선택하기" — 피그마 디자인이 없어 홈 토큰으로 만든 검색 + 목록 시트 */
+/** 피그마 Drag handle: 위 여백 8 + 높이 16 영역 가운데 36×4 (border색, r2) */
+function SheetHandle() {
+  return (
+    <View style={styles.handleArea}>
+      <View style={styles.handle} />
+    </View>
+  );
+}
+
+/** "직접 지역 선택하기" — 피그마 디자인이 없어 여행 탭 토큰으로 만든 검색 + 목록 시트 (1일 기준 추첨 가능 지역) */
 export function RegionPickerSheet({ ref, regions, isPending, error, onRetry, onSelect, onDismiss }: Props) {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
@@ -163,4 +171,6 @@ const styles = StyleSheet.create({
   },
   rowText: { flex: 1 },
   empty: { paddingTop: space[32], paddingHorizontal: screenPadding, gap: space[8] },
+  handleArea: { height: 24, paddingTop: space[8], alignItems: "center", justifyContent: "center" },
+  handle: { width: 36, height: 4, borderRadius: radius.xs, backgroundColor: colors.border },
 });

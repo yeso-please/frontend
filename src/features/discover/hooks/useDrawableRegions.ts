@@ -7,11 +7,11 @@ import type { ScheduleDensity } from "@/api/types";
 
 import { toMapRegion } from "../lib/regions";
 
-// 홈 추첨은 여행(날짜)이 정해지기 전이라 days=1(당일)로 가능 여부를 봅니다.
-// 긴 일정을 감당 못 하는 지역은 날짜 화면에서 GET /regions?days=N 으로 막습니다 (docs/app-architecture.md).
+// 지역 먼저 흐름(D1)은 날짜를 모를 때 1일 기준으로 뽑습니다 (7-5와 같은 기준).
+// 직접 고르기 목록과 핀이 "찾는 중"에 들르는 자리에 씁니다. 실제 추첨은 서버(POST /regions/draw)가 합니다.
 const DRAW_DAYS = 1;
 
-/** 온보딩에서 고른 일정 밀도(없으면 RELAXED)로 추첨 가능한 지역 목록을 받아 지도 좌표를 붙입니다. */
+/** 최신 설문의 일정 밀도(없으면 RELAXED)로 1일 기준 추첨 가능한 지역을 받아 지도 좌표를 붙입니다. */
 export function useDrawableRegions() {
   const onboarding = useQuery({
     queryKey: queryKeys.myOnboarding,
@@ -23,7 +23,7 @@ export function useDrawableRegions() {
   const regions = useQuery({
     queryKey: queryKeys.regions(DRAW_DAYS, density),
     queryFn: () => regionApi.list({ days: DRAW_DAYS, scheduleDensity: density }),
-    // 온보딩 결과를 못 받아도(오류) 기본 밀도로 진행합니다.
+    // 설문 결과를 못 받아도(오류) 기본 밀도로 진행합니다.
     enabled: !onboarding.isPending,
     staleTime: 10 * 60_000,
   });
@@ -38,7 +38,6 @@ export function useDrawableRegions() {
     isPending: onboarding.isPending || regions.isPending,
     isError: regions.isError,
     error: regions.error,
-    isRefetching: regions.isRefetching,
     refetch: () => {
       if (onboarding.isError) onboarding.refetch();
       return regions.refetch();
