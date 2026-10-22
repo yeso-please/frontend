@@ -12,7 +12,7 @@ import { colors, fonts, radius, space } from "@/theme";
 import { MBTI_IMAGES, MBTI_PROFILES } from "./profiles";
 import { isMbtiType } from "./types";
 
-/** MY 탭 "여행 MBTI" 카드 — 서버 mbtiCode가 있으면 캐릭터·유형·이름, 없으면(구형 설문) 다시 설문하기 */
+/** "나의 여행 성향" 요약 카드 — 서버 mbtiCode가 있으면 캐릭터·유형·이름, 없으면(구형 설문) 성향검사 하기 */
 export function MbtiSummaryCard() {
   const onboarding = useQuery({ queryKey: queryKeys.myOnboarding, queryFn: onboardingApi.me });
   const type = onboarding.data?.submission?.mbtiCode;
@@ -22,7 +22,7 @@ export function MbtiSummaryCard() {
     const result = { type };
     return (
       <PressableScale
-        onPress={() => router.push("/my/mbti/result")}
+        onPress={() => router.push("/my/persona")}
         style={[styles.card, styles.resultCard]}
         accessibilityRole="button"
         accessibilityLabel={`나의 여행 성향 ${result.type} ${profile.name}`}
@@ -46,7 +46,7 @@ export function MbtiSummaryCard() {
             </AppText>
           </View>
           <AppText variant="small12" color="muted" numberOfLines={1}>
-            {profile.summary.join(" ")}
+            {profile.oneLiner}
           </AppText>
         </View>
         <Icons.ChevronRight width={16} height={16} />
@@ -61,13 +61,13 @@ export function MbtiSummaryCard() {
           <Icons.Spark width={20} height={20} />
         </View>
         <View style={styles.texts}>
-          <AppText variant="label">여행 MBTI</AppText>
+          <AppText variant="label">나의 여행 성향</AppText>
           <AppText variant="small13" color="muted">
-            {onboarding.isPending ? "불러오는 중이에요" : "취향 설문을 다시 하면 12개의 질문으로 나의 여행 성향을 알 수 있어요."}
+            {onboarding.isPending ? "불러오는 중이에요" : "성향검사를 하면 나에게 맞는 여행 성향을 알 수 있어요."}
           </AppText>
         </View>
       </View>
-      <Button label="취향 설문 다시 하기" variant="secondary" height={44} disabled={onboarding.isPending} onPress={() => router.push("/my/taste")} />
+      <Button label="성향검사 하기" variant="secondary" height={44} disabled={onboarding.isPending} onPress={() => router.push("/survey")} />
     </View>
   );
 }

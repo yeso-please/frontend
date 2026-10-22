@@ -1,72 +1,55 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
-import { BackHandler, Keyboard, ScrollView, StyleSheet, View } from "react-native";
-import Animated from "react-native-reanimated";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { BackHandler, ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import Animated, { FadeIn, FadeInDown, FadeOut } from "react-native-reanimated";
 import { toast } from "sonner-native";
 
-import { onboardingApi, regionApi } from "@/api/endpoints";
+import { onboardingApi } from "@/api/endpoints";
 import { errorMessage, isApiError } from "@/api/errors";
 import { queryKeys } from "@/api/queryKeys";
-import type { OnboardingQuestions, OnboardingSubmission, OnboardingSubmissionRequest, Region, ScheduleDensity } from "@/api/types";
-import { Icons } from "@/components/icons";
-import { BottomCTA, Button, ErrorView, LoadingView, Screen } from "@/components/ui";
-import { isMbtiType, MbtiProfileView, QuestionStep, SurveyTopBar } from "@/features/mbti";
+import type { MyOnboarding, OnboardingQuestions, OnboardingSubmission } from "@/api/types";
+import { AppText, BottomCTA, Button, EmptyView, ErrorView, LoadingView, ProgressBar, Screen, TopBar } from "@/components/ui";
+import { isMbtiType, PersonaResult } from "@/features/mbti";
 import { haptics } from "@/lib/haptics";
 import { useAuthStore } from "@/store/auth";
-import { screenPadding, space } from "@/theme";
+import { colors, motion, screenPadding, space } from "@/theme";
 
 import { AnalysisView } from "./AnalysisView";
-import { DensityStep } from "./DensityStep";
-import { MotiveStep } from "./MotiveStep";
-import { OnboardingHeader } from "./OnboardingHeader";
-import { OnboardingResult } from "./OnboardingResult";
-import { RegionStep } from "./RegionStep";
-import { StyleStep } from "./StyleStep";
-import { useStepTransition, wait } from "./useStepTransition";
+import { MotiveSection } from "./MotiveSection";
+import { MbtiQuestionCard, StyleQuestionCard } from "./QuestionCards";
+import { answeredCount, buildSteps, buildSubmission, emptyAnswers, firstUnanswered, isStepAnswered, type SurveyAnswers, type SurveyStep } from "./survey";
+import type { CardState, SurveyCardHandle } from "./SurveyCard";
 
 export type OnboardingMode = "first" | "retake";
 
-const STEP_COUNT = 4;
 /** 분석 화면을 최소 이만큼은 보여 줍니다 (응답이 빨라도 깜빡이지 않게) */
 const MIN_ANALYSIS_MS = 1400;
+/** 답을 고른 뒤 다음 카드로 넘어가기 전 잠깐 (고른 모습을 보여 주려고) */
+const ADVANCE_DELAY_MS = 260;
+/** 카드를 화면 맨 위에서 이만큼 띄워 맞춥니다 */
+const SCROLL_TOP_GAP = 16;
 
-type Answers = {
-  styles: Record<string, number>;
-  motives: number[];
-  regions: Region[];
-  density: ScheduleDensity | null;
-  excluded: string[];
-};
+const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /**
- * 온보딩 설문(aihub-traveler-v2): 취향 4단계(스타일·동기·좋아한 지역·여행 방식) → 여행 MBTI 12문항(피그마 S1) → 분석(S3) → 결과(B).
- * MBTI는 서버가 mbtiAnswers로 계산하는 표시용 분류이며 추천에는 쓰이지 않습니다.
- * - first: 가입 직후. 결과 화면의 "핀 꽂으러 가기"에서 onboardingCompleted를 켜면 루트 가드가 탭으로 바꿉니다.
- * - retake: MY → "여행 취향 다시 설정". 이전 답을 채워 두고, 끝나면 토스트 후 뒤로 갑니다.
+ * 취향 설문(aihub-traveler-v2) — 피그마 초안 C1a 한 페이지 세로 스크롤:
+ * 여행 성향 4문항(5단 슬라이더) → 여행 MBTI 12문항 → 여행 동기 → "내 여행 성향 보기" → 분석 → C6 결과.
+ * 지금 답할 카드만 강조하고, 답하면 다음 카드로 부드럽게 내려갑니다. 일정 밀도는 묻지 않습니다(서버가 J/P로 정함).
+ * - first: 가입 직후. 결과의 "코스 만들기"에서 onboardingCompleted를 켜면 루트 가드가 탭으로 바꾸고 여행 탭으로 갑니다.
+ * - retake: 홈·MY → 성향검사 다시하기 (/survey). 새 제출이 최신 취향이 됩니다.
  */
 export function OnboardingFlow({ mode }: { mode: OnboardingMode }) {
-  const retake = mode === "retake";
   const questionsQuery = useQuery({ queryKey: queryKeys.onboardingQuestions, queryFn: onboardingApi.questions });
-  // 다시 설정할 때는 이전 답으로 미리 채웁니다 (실패하면 빈 설문으로 시작)
-  const previousQuery = useQuery({ queryKey: queryKeys.myOnboarding, queryFn: onboardingApi.me, enabled: retake });
-  const regionsQuery = useQuery({ queryKey: queryKeys.regions(), queryFn: () => regionApi.list(), enabled: retake });
-  // 문항 버전이 바뀌어 처음부터 다시 할 때 폼을 새로 마운트합니다
+  // 문항 버전이 바뀌어 처음부터 다시 할 때 화면을 새로 마운트합니다
   const [session, setSession] = useState(0);
-
-  const restart = async () => {
-    await questionsQuery.refetch();
-    setSession((s) => s + 1);
-  };
-
   const questions = questionsQuery.data;
-  const loading = questionsQuery.isPending || (retake && (previousQuery.isLoading || regionsQuery.isLoading));
 
-  if (!questions || loading) {
+  if (!questions) {
     return (
       <Screen>
-        <OnboardingHeader showBack={retake} onBack={() => router.back()} step={null} total={STEP_COUNT} />
-        {questionsQuery.isError && !questions ? (
+        <TopBar title="취향 설문" showBack={mode === "retake"} />
+        {questionsQuery.isError ? (
           <ErrorView error={questionsQuery.error} onRetry={() => questionsQuery.refetch()} />
         ) : (
           <LoadingView label="설문을 준비하고 있어요" />
@@ -76,146 +59,99 @@ export function OnboardingFlow({ mode }: { mode: OnboardingMode }) {
   }
 
   return (
-    <OnboardingForm
+    <SurveyPage
       key={`${questions.questionVersion}:${session}`}
       mode={mode}
       questions={questions}
-      initial={initialAnswers(questions, session === 0 ? previousQuery.data?.submission : null, regionsQuery.data?.regions)}
-      onRestart={restart}
+      onRestart={async () => {
+        await questionsQuery.refetch();
+        setSession((s) => s + 1);
+      }}
     />
   );
 }
 
-function initialAnswers(questions: OnboardingQuestions, previous: OnboardingSubmission | null | undefined, regionList: Region[] | undefined): Answers {
-  const styles = Object.fromEntries(
-    questions.travelStyles.map((q) => {
-      const prev = previous?.travelStyles[String(q.number)];
-      return [String(q.number), prev !== undefined && prev >= q.minValue && prev <= q.maxValue ? prev : q.neutralValue];
-    }),
-  );
-  if (!previous) return { styles, motives: [], regions: [], density: null, excluded: [] };
-  const codes = new Set(questions.travelMotives.map((m) => m.code));
-  return {
-    styles,
-    motives: previous.travelMotives.filter((c) => codes.has(c)).slice(0, questions.maxTravelMotives),
-    regions: previous.likedRegions
-      .map((id) => regionList?.find((r) => r.sigCd === id))
-      .filter((r): r is Region => !!r)
-      .slice(0, questions.maxLikedRegions),
-    density: questions.scheduleDensityOptions.includes(previous.scheduleDensity) ? previous.scheduleDensity : null,
-    // 제출 응답에는 excludeTags가 없을 수 있습니다 (백엔드 OnboardingSubmissionResponse)
-    excluded: (previous.excludeTags ?? []).filter((t) => questions.excludeTags.includes(t)),
-  };
-}
+type Phase = "survey" | "analyzing" | "result";
 
-type Phase = "form" | "mbti" | "analyzing" | "result";
-
-function OnboardingForm({ mode, questions, initial, onRestart }: { mode: OnboardingMode; questions: OnboardingQuestions; initial: Answers; onRestart: () => void }) {
+function SurveyPage({ mode, questions, onRestart }: { mode: OnboardingMode; questions: OnboardingQuestions; onRestart: () => void }) {
   const queryClient = useQueryClient();
-  const nickname = useAuthStore((s) => s.user?.nickname);
-  const { entering, exiting, go } = useStepTransition();
+  const [phase, setPhase] = useState<Phase>("survey");
+  const [answers, setAnswers] = useState<SurveyAnswers>(emptyAnswers);
+  const [result, setResult] = useState<OnboardingSubmission | null>(null);
+  const steps = useMemo(() => buildSteps(questions), [questions]);
 
-  const [step, setStep] = useState(0);
-  const [phase, setPhase] = useState<Phase>("form");
-  const [styleValues, setStyleValues] = useState(initial.styles);
-  const [motives, setMotives] = useState(initial.motives);
-  const [regions, setRegions] = useState(initial.regions);
-  const [density, setDensity] = useState(initial.density);
-  const [excluded, setExcluded] = useState(initial.excluded);
-  const [submission, setSubmission] = useState<OnboardingSubmission | null>(null);
-  // 여행 MBTI 12문항 (v2). 서버가 이전 답을 돌려주지 않아 다시 설정할 때도 새로 답합니다.
-  const mbtiQuestions = questions.mbtiQuestions ?? [];
-  const [mbtiIndex, setMbtiIndex] = useState(0);
-  const [mbtiAnswers, setMbtiAnswers] = useState<Record<string, 1 | 2>>({});
-  const submitMutation = useMutation({ mutationFn: onboardingApi.submit });
+  const scrollRef = useRef<ScrollView>(null);
+  const offsets = useRef<Record<string, number>>({});
+  const cardRefs = useRef<Record<string, SurveyCardHandle | null>>({});
+  const answersRef = useRef(answers);
+  const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const canNext = step === 1 ? motives.length > 0 : step === 3 ? density !== null : true;
-
-  const goTo = (next: number) => {
-    Keyboard.dismiss();
-    go(next > step ? 1 : -1);
-    setStep(next);
-  };
-
-  const back = () => {
-    if (phase === "mbti") {
-      go(-1);
-      if (mbtiIndex > 0) setMbtiIndex(mbtiIndex - 1);
-      else setPhase("form");
-      return;
-    }
-    if (phase !== "form") return;
-    if (step > 0) goTo(step - 1);
-    else if (mode === "retake") router.back();
-  };
-
-  const currentMbti = mbtiQuestions[mbtiIndex];
-  const nextMbti = () => {
-    if (!currentMbti || !mbtiAnswers[String(currentMbti.number)]) return;
-    if (mbtiIndex < mbtiQuestions.length - 1) {
-      go(1);
-      setMbtiIndex(mbtiIndex + 1);
-    } else submit();
-  };
-
-  // 취향 4단계를 마치면 MBTI 문항으로 (v1 서버처럼 문항이 없으면 바로 제출)
-  const finishForm = () => {
-    if (mbtiQuestions.length === 0) {
-      submit();
-      return;
-    }
-    Keyboard.dismiss();
-    go(1);
-    setPhase("mbti");
-  };
-
-  // Android 뒤로가기: 단계 안에서는 이전 단계로, 분석 중에는 막습니다
   useEffect(() => {
-    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (phase === "analyzing") return true;
-      if (phase === "result") return mode === "first";
-      if (phase === "mbti") {
-        go(-1);
-        if (mbtiIndex > 0) setMbtiIndex(mbtiIndex - 1);
-        else setPhase("form");
-        return true;
-      }
-      if (step > 0) {
-        Keyboard.dismiss();
-        go(-1);
-        setStep(step - 1);
-        return true;
-      }
-      return false;
-    });
+    answersRef.current = answers;
+  }, [answers]);
+  useEffect(
+    () => () => {
+      if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    },
+    [],
+  );
+
+  // Android 뒤로가기: 분석 중에는 막고, 첫 설문 결과에서는 설문으로 돌아가지 않습니다(이미 저장됨)
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => phase === "analyzing" || (phase === "result" && mode === "first"));
     return () => sub.remove();
-  }, [phase, step, mode, go, mbtiIndex]);
+  }, [phase, mode]);
+
+  const next = firstUnanswered(steps, answers);
+  const complete = next === null;
+  const activeIndex = next ? steps.indexOf(next) : -1;
+  const stateOf = (step: SurveyStep, index: number): CardState =>
+    index === activeIndex ? "active" : isStepAnswered(step, answers) ? "answered" : "upcoming";
+
+  const scrollTo = (key: string) => {
+    const y = offsets.current[key];
+    if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(0, y - SCROLL_TOP_GAP), animated: true });
+  };
+
+  /** 방금 답한 문항 다음에 남은 문항이 있으면 그 카드로 내려갑니다 (앞쪽 빈 문항으로 되돌아 올라가지는 않음) */
+  const advanceFrom = (key: string) => {
+    if (advanceTimer.current) clearTimeout(advanceTimer.current);
+    advanceTimer.current = setTimeout(() => {
+      const from = steps.findIndex((s) => s.key === key);
+      const target = steps.find((s, i) => i > from && !isStepAnswered(s, answersRef.current));
+      if (target) scrollTo(target.key);
+    }, ADVANCE_DELAY_MS);
+  };
+
+  const setStyle = (number: number, value: number) => setAnswers((a) => ({ ...a, styles: { ...a.styles, [String(number)]: value } }));
+  const setMbti = (step: SurveyStep, number: number, choice: 1 | 2) => {
+    setAnswers((a) => ({ ...a, mbti: { ...a.mbti, [String(number)]: choice } }));
+    advanceFrom(step.key);
+  };
+
+  const onCta = () => {
+    if (!next) {
+      void submit();
+      return;
+    }
+    // 아직 답하지 않은 첫 카드로 데려가 살짝 흔듭니다
+    haptics.reject();
+    scrollTo(next.key);
+    setTimeout(() => cardRefs.current[next.key]?.shake(), 320);
+  };
 
   const submit = async () => {
-    if (!density) return;
-    Keyboard.dismiss();
-    go(1);
     setPhase("analyzing");
     const minDelay = wait(MIN_ANALYSIS_MS);
-    const body: OnboardingSubmissionRequest = {
-      questionVersion: questions.questionVersion,
-      travelStyles: styleValues,
-      travelMotives: motives,
-      likedRegions: regions.map((r) => r.sigCd),
-      scheduleDensity: density,
-      excludeTags: excluded,
-      ...(mbtiQuestions.length ? { mbtiAnswers } : {}),
-    };
     try {
-      const res = await submitMutation.mutateAsync(body);
+      const res = await onboardingApi.submit(buildSubmission(questions, answers));
       await minDelay;
       haptics.confirm();
-      if (mode === "retake") {
-        queryClient.invalidateQueries({ queryKey: queryKeys.myOnboarding });
-        queryClient.invalidateQueries({ queryKey: queryKeys.me });
-      }
-      go(1);
-      setSubmission(res);
+      queryClient.setQueryData<MyOnboarding>(queryKeys.myOnboarding, { onboardingCompleted: true, submission: res });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.me });
+      // 성향이 바뀌면 지역 맞춤 문장(7-6)도 달라집니다
+      void queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] === "regions" && q.queryKey[2] === "match" });
+      setResult(res);
       setPhase("result");
     } catch (e) {
       await minDelay;
@@ -226,132 +162,151 @@ function OnboardingForm({ mode, questions, initial, onRestart }: { mode: Onboard
       }
       haptics.reject();
       toast.error(errorMessage(e));
-      go(-1);
-      // MBTI 답이 빠졌거나 잘못됐으면 첫 문항부터, 그 밖에는 취향 단계로 돌아갑니다
-      const mbtiError = isApiError(e, "ONBOARDING_MISSING_QUESTION_ANSWER") || isApiError(e, "ONBOARDING_INVALID_CHOICE");
-      if (mbtiError && mbtiQuestions.length) {
-        setMbtiIndex(0);
-        setPhase("mbti");
-      } else setPhase("form");
+      setPhase("survey");
     }
   };
 
-  const finish = () => {
+  const retake = () => {
+    setAnswers(emptyAnswers());
+    setResult(null);
+    setPhase("survey");
+  };
+
+  const makeCourse = () => {
     if (mode === "first") {
-      // 루트 가드(Stack.Protected)가 onboardingCompleted를 보고 탭으로 바꿔 줍니다
-      queryClient.invalidateQueries({ queryKey: queryKeys.myOnboarding });
-      queryClient.invalidateQueries({ queryKey: queryKeys.me });
+      // 루트 가드(Stack.Protected)가 onboardingCompleted를 보고 탭으로 바꾼 뒤 여행 탭으로 갑니다
       useAuthStore.getState().setOnboardingCompleted(true);
+      setTimeout(() => router.navigate("/(tabs)/travel"), 60);
       return;
     }
-    toast.success("여행 취향을 새로 저장했어요");
-    router.back();
+    router.navigate("/(tabs)/travel");
   };
 
-  const contentKey = phase === "form" ? `step-${step}` : phase === "mbti" ? `mbti-${mbtiIndex}` : phase;
-  const mbtiTotal = mbtiQuestions.length;
+  if (phase === "result" && result) {
+    return (
+      <Screen>
+        <TopBar title="나의 여행 성향" showBack={mode === "retake"} />
+        <Animated.View entering={FadeIn.duration(260)} style={styles.flex}>
+          {isMbtiType(result.mbtiCode) ? (
+            <PersonaResult type={result.mbtiCode} onMakeCourse={makeCourse} onRetake={retake} />
+          ) : (
+            // MBTI 없는 예전 문항(v1)으로 답한 경우 — 성향 대신 취향 요약만
+            <EmptyView title="여행 취향을 저장했어요" description={result.profileText || undefined} actionLabel="여행지 찾으러 가기" onAction={makeCourse} />
+          )}
+        </Animated.View>
+      </Screen>
+    );
+  }
 
-  const renderStep = () => {
-    switch (step) {
-      case 0:
-        return <StyleStep questions={questions.travelStyles} values={styleValues} onChange={(n, v) => setStyleValues((prev) => ({ ...prev, [String(n)]: v }))} />;
-      case 1:
-        return <MotiveStep motives={questions.travelMotives} max={questions.maxTravelMotives} selected={motives} onChange={setMotives} />;
-      case 2:
-        return <RegionStep max={questions.maxLikedRegions} selected={regions} onChange={setRegions} />;
-      default:
-        return (
-          <DensityStep
-            options={questions.scheduleDensityOptions}
-            density={density}
-            onDensity={setDensity}
-            excludeTags={questions.excludeTags}
-            excluded={excluded}
-            onExcluded={setExcluded}
-          />
-        );
-    }
-  };
-
-  const skipRegions = step === 2 && regions.length === 0;
+  const progress = answeredCount(steps, answers) / steps.length;
 
   return (
     <Screen>
-      {phase === "mbti" || phase === "analyzing" ? (
-        // 피그마 S1·S3 Survey Top Bar ("n / 12", 분석 중이면 "완료")
-        <SurveyTopBar
-          counter={phase === "analyzing" ? "완료" : `${mbtiIndex + 1} / ${mbtiTotal}`}
-          progress={phase === "analyzing" ? 1 : (mbtiIndex + 1) / Math.max(mbtiTotal, 1)}
-          complete={phase === "analyzing"}
-          onBack={back}
-          showBack={phase === "mbti"}
-        />
-      ) : (
-        <OnboardingHeader showBack={phase === "form" && (step > 0 || mode === "retake")} onBack={back} step={phase === "form" ? step : null} total={STEP_COUNT} />
-      )}
-
-      <View style={styles.body}>
-        <Animated.View key={contentKey} entering={entering} exiting={exiting} style={styles.page}>
-          {phase === "form" ? renderStep() : null}
-          {phase === "mbti" && currentMbti ? (
-            <QuestionStep
-              question={currentMbti}
-              answer={mbtiAnswers[String(currentMbti.number)] ?? null}
-              onAnswer={(choice) => setMbtiAnswers((prev) => ({ ...prev, [String(currentMbti.number)]: choice }))}
-            />
-          ) : null}
-          {phase === "analyzing" ? <AnalysisView footnote="곧, 나의 여행 성향을 만나요." /> : null}
-          {phase === "result" && submission ? (
-            isMbtiType(submission.mbtiCode) ? (
-              // 피그마 B · 성향 결과 + 아래에 서버 취향 요약
-              <ScrollView contentContainerStyle={styles.resultContent} showsVerticalScrollIndicator={false}>
-                <MbtiProfileView type={submission.mbtiCode}>
-                  <OnboardingResult submission={submission} motives={questions.travelMotives} regions={regions} excluded={excluded} compact />
-                </MbtiProfileView>
-              </ScrollView>
-            ) : (
-              <OnboardingResult submission={submission} motives={questions.travelMotives} regions={regions} excluded={excluded} nickname={nickname} />
-            )
-          ) : null}
-        </Animated.View>
+      <TopBar title="취향 설문" showBack={mode === "retake" && phase === "survey"} />
+      <View style={styles.progress}>
+        <ProgressBar progress={phase === "analyzing" ? 1 : progress} color={phase === "analyzing" ? colors.green : colors.blue} height={3} />
       </View>
 
-      {phase === "form" ? (
-        <BottomCTA>
-          <Button
-            label={step === STEP_COUNT - 1 ? (mbtiQuestions.length ? "다음" : "취향 분석하기") : skipRegions ? "건너뛰기" : "다음"}
-            variant={skipRegions ? "secondary" : "primary"}
-            disabled={!canNext}
-            onPress={() => (step === STEP_COUNT - 1 ? finishForm() : goTo(step + 1))}
-            accessibilityHint={!canNext ? (step === 1 ? "여행 동기를 하나 이상 골라주세요" : "여행 속도를 골라주세요") : undefined}
-          />
-        </BottomCTA>
-      ) : null}
-      {phase === "mbti" && currentMbti ? (
-        <BottomCTA>
-          <Button
-            label={mbtiIndex === mbtiTotal - 1 ? "내 여행 성향 보기" : "다음"}
-            disabled={!mbtiAnswers[String(currentMbti.number)]}
-            onPress={nextMbti}
-            accessibilityHint={!mbtiAnswers[String(currentMbti.number)] ? "답을 하나 골라주세요" : undefined}
-          />
-        </BottomCTA>
-      ) : null}
-      {phase === "result" ? (
-        <BottomCTA>
-          <Button
-            label={mode === "first" ? "핀 꽂으러 가기" : "완료"}
-            leftIcon={mode === "first" ? <Icons.PinButton width={21} height={21} /> : undefined}
-            onPress={finish}
-          />
-        </BottomCTA>
-      ) : null}
+      {phase === "analyzing" ? (
+        <Animated.View key="analyzing" entering={FadeIn.duration(220)} exiting={FadeOut.duration(160)} style={styles.flex}>
+          <AnalysisView title={"나의 여행 성향을\n찾고 있어요"} description={"고른 답을 모아,\n나에게 맞는 여행 방식을 정리하는 중이에요."} />
+        </Animated.View>
+      ) : (
+        <>
+          <ScrollView ref={scrollRef} contentContainerStyle={styles.content} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+            <Animated.View entering={FadeInDown.springify().damping(motion.spring.gentle.damping)} style={styles.intro}>
+              <AppText variant="title" accessibilityRole="header">
+                {"어떤 여행이\n나와 잘 맞을까요?"}
+              </AppText>
+              <AppText variant="small13" color="muted">
+                {"정답은 없어요. 더 끌리는 쪽을 골라주세요.\n답할수록 나의 여행 성향이 또렷해져요."}
+              </AppText>
+            </Animated.View>
+
+            {steps.map((step, i) => {
+              const onLayout = (e: LayoutChangeEvent) => {
+                offsets.current[step.key] = e.nativeEvent.layout.y;
+              };
+              const ref = (r: SurveyCardHandle | null) => {
+                cardRefs.current[step.key] = r;
+              };
+              if (step.kind === "style") {
+                return (
+                  <StyleQuestionCard
+                    key={step.key}
+                    ref={ref}
+                    state={stateOf(step, i)}
+                    order={step.order}
+                    total={step.total}
+                    onLayout={onLayout}
+                    question={step.question}
+                    value={answers.styles[String(step.question.number)]}
+                    onChange={(v) => setStyle(step.question.number, v)}
+                    onRelease={() => advanceFrom(step.key)}
+                    enterDelay={motion.stagger * (i + 1)}
+                  />
+                );
+              }
+              if (step.kind === "mbti") {
+                // 카드는 스크롤 내용의 바로 아래 자식이어야 onLayout y가 스크롤 위치와 맞습니다 (그래서 묶음 View 없이 Fragment)
+                return (
+                  <Fragment key={step.key}>
+                    {step.order === 1 ? (
+                      <View style={styles.sectionIntro}>
+                        <AppText variant="cardTitle" accessibilityRole="header">
+                          조금 더 알아볼게요
+                        </AppText>
+                        <AppText variant="small13" color="muted">
+                          {`여행할 때 나와 더 가까운 쪽을 골라주세요. ${step.total}개의 질문으로 나의 여행 성향을 찾아요.`}
+                        </AppText>
+                      </View>
+                    ) : null}
+                    <MbtiQuestionCard
+                      ref={ref}
+                      state={stateOf(step, i)}
+                      order={step.order}
+                      total={step.total}
+                      onLayout={onLayout}
+                      question={step.question}
+                      value={answers.mbti[String(step.question.number)]}
+                      onChange={(c) => setMbti(step, step.question.number, c)}
+                    />
+                  </Fragment>
+                );
+              }
+              return (
+                <MotiveSection
+                  key={step.key}
+                  ref={ref}
+                  state={stateOf(step, i)}
+                  motives={questions.travelMotives}
+                  max={questions.maxTravelMotives}
+                  selected={answers.motives}
+                  onChange={(codes) => setAnswers((a) => ({ ...a, motives: codes }))}
+                  onLayout={onLayout}
+                />
+              );
+            })}
+          </ScrollView>
+          <BottomCTA>
+            <Button
+              label="내 여행 성향 보기"
+              variant={complete ? "primary" : "neutral"}
+              labelColor={complete ? undefined : "muted"}
+              onPress={onCta}
+              accessibilityHint={complete ? "답을 보내고 나의 여행 성향을 확인해요" : "아직 답하지 않은 질문으로 이동해요"}
+            />
+          </BottomCTA>
+        </>
+      )}
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
-  body: { flex: 1, overflow: "hidden" },
-  page: { flex: 1 },
-  resultContent: { paddingHorizontal: screenPadding, paddingTop: space[8], paddingBottom: space[24] },
+  flex: { flex: 1 },
+  progress: { paddingHorizontal: screenPadding, paddingBottom: space[8] },
+  content: { paddingHorizontal: screenPadding, paddingTop: space[16], paddingBottom: space[32], gap: space[16] },
+  intro: { gap: space[8], marginBottom: space[8] },
+  sectionIntro: { gap: space[8], marginTop: space[16] },
 });

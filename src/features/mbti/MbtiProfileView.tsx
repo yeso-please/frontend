@@ -6,7 +6,7 @@ import Animated, { FadeInDown, ZoomIn } from "react-native-reanimated";
 import { AppText } from "@/components/ui";
 import { colors, fonts, motion, radius, space } from "@/theme";
 
-import { MBTI_IMAGES, MBTI_PROFILES } from "./profiles";
+import { joinDot, MBTI_IMAGES, MBTI_PROFILES } from "./profiles";
 import type { MbtiType } from "./types";
 
 const CHARACTER = 214;
@@ -20,14 +20,14 @@ type Props = {
   children?: ReactNode;
 };
 
-/** 피그마 B · 성향 결과 (400:1385, TriPin/Profile/Result Template) 본문. 스크롤 컨테이너는 화면이 감쌉니다. */
+/** 피그마 C6 · 나의 여행 성향 (TriPin/Profile/Result Template) 본문. 스크롤 컨테이너는 화면이 감쌉니다. */
 export function MbtiProfileView({ type, extraRows = [], children }: Props) {
   const profile = MBTI_PROFILES[type];
   const rows: [string, string][] = [
     ["여행 속도", profile.pace],
-    ["선호 장소", profile.places],
-    ["좋아하는 활동", profile.activities],
-    ["잘 맞는 동행", profile.companions],
+    ["선호 장소", joinDot(profile.places)],
+    ["좋아하는 활동", joinDot(profile.activities)],
+    ["잘 맞는 동행", joinDot(profile.companions)],
     ...extraRows.filter(([, value]) => !!value),
   ];
 
@@ -50,18 +50,18 @@ export function MbtiProfileView({ type, extraRows = [], children }: Props) {
 
       <Animated.View entering={enter(1)}>
         <AppText variant="bodyMedium15" align="center">
-          {profile.summary.join("\n")}
+          {profile.oneLiner}
         </AppText>
       </Animated.View>
 
       <Animated.View entering={enter(2)}>
         <AppText variant="small13" color="muted" align="center">
-          {profile.description.join("\n")}
+          {profile.description}
         </AppText>
       </Animated.View>
 
       <Animated.View entering={enter(3)} style={styles.traits}>
-        {profile.traits.map((trait) => (
+        {profile.hashtags.map((trait) => (
           <View key={trait} style={styles.trait}>
             <AppText variant="caption" color="darkgreen" style={styles.traitText}>
               {`#${trait}`}
