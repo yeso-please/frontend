@@ -10,11 +10,10 @@ import { colors, motion } from "@/theme";
 
 type TabMeta = { label: string; icon: (active: boolean) => React.ReactNode };
 
-// 피그마 TriPin/Bottom navigation — 홈 / 여행 / 저장 / MY. 활성 = darkgreen 아이콘·라벨
+// 피그마 TriPin/Navigation — 홈 / 여행 / MY. 활성 = darkgreen 아이콘·라벨. "저장"은 이번 범위에서 뺍니다 (D14).
 const TABS: Record<string, TabMeta> = {
   index: { label: "홈", icon: (a) => (a ? <Icons.NavHomeActive width={22} height={22} /> : <Icons.NavHome width={22} height={22} />) },
-  trips: { label: "여행", icon: (a) => (a ? <Icons.NavTripActive width={22} height={22} /> : <Icons.NavTrip width={22} height={22} />) },
-  saved: { label: "저장", icon: (a) => (a ? <Icons.NavSaveActive width={22} height={22} /> : <Icons.NavSave width={22} height={22} />) },
+  travel: { label: "여행", icon: (a) => (a ? <Icons.NavTripActive width={22} height={22} /> : <Icons.NavTrip width={22} height={22} />) },
   my: { label: "MY", icon: (a) => (a ? <Icons.NavUserActive width={22} height={22} /> : <Icons.NavUser width={22} height={22} />) },
 };
 
