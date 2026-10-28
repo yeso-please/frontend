@@ -4,6 +4,8 @@ import { api } from "./client";
 import type {
   Alternatives,
   AttractionCategory,
+  AttractionDetail,
+  AttractionPins,
   AuthResponse,
   ContextCheck,
   ContextCheckRequest,
@@ -79,6 +81,14 @@ export const regionApi = {
   draw: (body: DrawRequest) => api.post<DrawResult>("/regions/draw", body),
   /** 7-6 성향 맞춤 지역 문장 (닉네임은 화면이 앞에 붙입니다) */
   match: (sigCd: string) => api.get<RegionMatch>(`/regions/${sigCd}/match`),
+};
+
+export const attractionApi = {
+  /** 7-3 지도 관광지 핀. bbox는 "minLng,minLat,maxLng,maxLat" (생략하면 지역 전체) */
+  pins: (sigCd: string, params?: { bbox?: string; category?: AttractionCategory; cursor?: string; limit?: number }) =>
+    api.get<AttractionPins>(`/regions/${sigCd}/attractions`, { query: params }),
+  /** 7-4 관광지 상세 */
+  detail: (attractionId: number) => api.get<AttractionDetail>(`/attractions/${attractionId}`),
 };
 
 export const tripApi = {

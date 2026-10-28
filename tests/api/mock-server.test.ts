@@ -719,3 +719,30 @@ describe("보낸 링크 목록·취소 (2-5·2-6, 4-2·4-3, 4-9~4-13, 6-9·6-10)
     expect((await call("GET", `/invites/${link.json.token}`)).json.code).toBe("INVITE_REVOKED");
   });
 });
+
+describe("지도 관광지 핀·상세 (7-3·7-4)", () => {
+  it("지역 핀은 범위로 거르고, 잘못된 범위는 ATTRACTION_INVALID_BOUNDS", async () => {
+    const { token } = await onboarded();
+    const all = await call<{ items: { attractionId: number; lat: number; lng: number; recommendable: boolean }[]; nextCursor: null }>("GET", "/regions/51150/attractions", undefined, token);
+    expect(all.json.items.length).toBeGreaterThan(0);
+    expect(all.json.nextCursor).toBeNull();
+
+    const p = all.json.items[0];
+    const box = `${p.lng - 0.001},${p.lat - 0.001},${p.lng + 0.001},${p.lat + 0.001}`;
+    const near = await call<{ items: { attractionId: number }[] }>("GET", `/regions/51150/attractions?bbox=${box}`, undefined, token);
+    expect(near.json.items.map((i) => i.attractionId)).toContain(p.attractionId);
+
+    expect((await call("GET", "/regions/51150/attractions?bbox=0,0,1,1", undefined, token)).json.code).toBe("ATTRACTION_INVALID_BOUNDS");
+    expect((await call("GET", "/regions/99999/attractions", undefined, token)).json.code).toBe("REGION_NOT_FOUND");
+  });
+
+  it("관광지 상세는 원천 설명·운영 정보·출처를 주고, 없는 곳은 ATTRACTION_NOT_FOUND", async () => {
+    const { token } = await onboarded();
+    const pins = await call<{ items: { attractionId: number }[] }>("GET", "/regions/51150/attractions", undefined, token);
+    const detail = await call<{ attractionId: number; sources: unknown[]; estimatedDurationMinutes: number }>("GET", `/attractions/${pins.json.items[0].attractionId}`, undefined, token);
+    expect(detail.status).toBe(200);
+    expect(detail.json.sources.length).toBeGreaterThan(0);
+    expect(detail.json.estimatedDurationMinutes).toBeGreaterThan(0);
+    expect((await call("GET", "/attractions/1", undefined, token)).json.code).toBe("ATTRACTION_NOT_FOUND");
+  });
+});

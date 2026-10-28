@@ -1,3 +1,4 @@
+import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { router } from "expo-router";
 import { useMemo, useRef, useState } from "react";
@@ -9,7 +10,7 @@ import { courseApi } from "@/api/endpoints";
 import { errorMessage, isApiError } from "@/api/errors";
 import { queryKeys } from "@/api/queryKeys";
 import type { AlternativeItem } from "@/api/types";
-import { AppText, BottomCTA, Button, EmptyView, ErrorView, LoadingView, Screen, TopBar } from "@/components/ui";
+import { AppText, BottomCTA, Button, EmptyView, ErrorView, LoadingView, PressableScale, Screen, TopBar } from "@/components/ui";
 import { ConfirmDialog } from "@/features/course/components/ConfirmDialog";
 import { useCourse, useCourseEdit } from "@/features/course/useCourse";
 import { KakaoMapView } from "@/features/kakaoMap";
@@ -18,6 +19,7 @@ import { haptics } from "@/lib/haptics";
 import { withEulReul, withEuro } from "@/lib/josa";
 import { colors, motion, radius, screenPadding, space } from "@/theme";
 
+import { AttractionDetailSheet } from "./components/AttractionDetailSheet";
 import { CandidateRow } from "./components/CandidateRow";
 import { CurrentPlaceCard } from "./components/CurrentPlaceCard";
 import { NoteField } from "./components/NoteField";
@@ -65,6 +67,13 @@ export function PlaceEditScreen({ tripId, itemId }: { tripId: number; itemId: st
     [searching, alternatives.data, current?.category],
   );
   const [selected, setSelected] = useState<AlternativeItem | null>(null);
+  // 관광지 상세 (7-4): 지금 장소나 고른 후보의 설명·운영 시간·사진
+  const detailRef = useRef<BottomSheetModal>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const openDetail = (attractionId: number) => {
+    setDetailId(attractionId);
+    detailRef.current?.present();
+  };
   const [note, setNote] = useState("");
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [mapTouching, setMapTouching] = useState(false);
@@ -174,6 +183,11 @@ export function PlaceEditScreen({ tripId, itemId }: { tripId: number; itemId: st
               현재 장소
             </AppText>
             <CurrentPlaceCard item={current} dayIndex={found.dayIndex} />
+            <PressableScale onPress={() => openDetail(current.attractionId)} haptic="tick" hitSlop={8} style={styles.detailLink} accessibilityRole="button" accessibilityLabel={`${current.name} 장소 정보 보기`}>
+              <AppText variant="small13Medium" color="darkgreen">
+                장소 정보 보기 ›
+              </AppText>
+            </PressableScale>
           </View>
 
           <View style={styles.block}>
@@ -267,6 +281,11 @@ export function PlaceEditScreen({ tripId, itemId }: { tripId: number; itemId: st
                 </AppText>
               ) : null}
               <AppText variant="small12" color="muted">{`지금 장소 · ${current.name}`}</AppText>
+              <PressableScale onPress={() => openDetail(selected.attractionId)} haptic="tick" hitSlop={8} style={styles.detailLink} accessibilityRole="button" accessibilityLabel={`${selected.name} 장소 정보 보기`}>
+                <AppText variant="small13Medium" color="darkgreen">
+                  장소 정보 보기 ›
+                </AppText>
+              </PressableScale>
               <AppText variant="small12" color="darkgreen">
                 기존 장소의 추가·추천 이력은 변경 표시에서 유지해요.
               </AppText>
@@ -312,11 +331,13 @@ export function PlaceEditScreen({ tripId, itemId }: { tripId: number; itemId: st
         onConfirm={remove}
         onCancel={() => setConfirmRemove(false)}
       />
+      <AttractionDetailSheet sheetRef={detailRef} attractionId={detailId} />
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
+  detailLink: { alignSelf: "flex-start", paddingVertical: space[4] },
   flex: { flex: 1 },
   content: { paddingHorizontal: screenPadding, paddingTop: space[16], paddingBottom: space[24], gap: space[24] },
   intro: { gap: space[8] },

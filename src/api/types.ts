@@ -299,6 +299,31 @@ export type FriendLinkPreview = { valid: boolean; inviterNickname: string };
 
 // ── 코스 ──
 export type AttractionCategory = "NATURE" | "HISTORY_CULTURE" | "ACTIVITY" | "WALK_REST" | "ETC";
+/** 7-3 지도 관광지 핀 — 추천 불가 장소도 옵니다(recommendable false: 흐리게, 코스에 못 넣음) */
+export type AttractionPin = { attractionId: number; name: string; thumbnailUrl: string | null; category: AttractionCategory; lat: number; lng: number; recommendable: boolean };
+export type AttractionPins = { items: AttractionPin[]; nextCursor: string | null };
+/** 7-4 관광지 상세. description은 원천 그대로(생성 문장 아님), oneLine은 사람이 승인한 한 줄 */
+export type AttractionDetail = {
+  attractionId: number;
+  regionSigCd: string;
+  name: string;
+  category: AttractionCategory;
+  address: string | null;
+  lat: number;
+  lng: number;
+  description: string | null;
+  images: { url: string; sourceName: string | null; license: string | null }[];
+  useTime: string | null;
+  restDate: string | null;
+  estimatedDurationMinutes: number;
+  estimated: boolean;
+  recommendable: boolean;
+  notRecommendableReasons: ("MISSING_DESCRIPTION" | "MISSING_IMAGE" | "MISSING_COORDINATE" | "QUALITY_ISSUE")[];
+  sources: { name: string; contentId?: string | null; fetchedAt?: string | null }[];
+  oneLine: string | null;
+  tags: string[];
+  summaryBasis: "SOURCE_SUMMARY" | "NAME_CATEGORY" | null;
+};
 export type RouteSource = "ROAD" | "ROUTE" | "STRAIGHT";
 /** 앞 지점에서 이 지점까지 세 수단의 이동 (D5). 그날 첫 지점·식당 미정 식사는 null */
 export type TravelLeg = {

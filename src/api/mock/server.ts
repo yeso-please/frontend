@@ -24,7 +24,7 @@ import type {
 } from "../types";
 import { addDays, fail, isYmd, MockError, nowIso, ok, type Raw, today, token } from "./common";
 import { alternatives, applyOperations, generateCourse, type MockCourse, restaurantRecommendations, restaurantSearch, routes, toCourse } from "./course";
-import { attractionsFor, BASE_REGIONS, distanceMeters, findRegion, isEligible, maxNightsFor, regionName, regionShortName } from "./data";
+import { attractionsFor, BASE_REGIONS, distanceMeters, findAttraction, findRegion, isEligible, maxNightsFor, regionName, regionShortName } from "./data";
 import { computeMbti, MOCK_MBTI_QUESTIONS } from "./mbti";
 
 type MockUser = { id: number; email: string | null; password: string | null; nickname: string; kakaoId?: string };
@@ -768,6 +768,55 @@ on("GET", "/invites/:token/course", ({ db: d }, [value]) => {
   const { trip } = inviteByToken(d, value);
   return ok(toCourse(trip, d.courses[trip.id] ?? null, { role: "VIEWER" }));
 }, { auth: false });
+
+// ── 지도 관광지 핀·상세 (7-3·7-4) ──
+// 목업 관광지는 모두 추천 가능으로 보되, 이름 끝 번호가 붙은 장소(같은 이름이 한 바퀴 돈 것)는 추천 불가로 둡니다.
+const recommendableMock = (name: string) => !/\s\d+$/.test(name);
+
+on("GET", "/regions/:sigCd/attractions", ({ query }, [sigCd]) => {
+  if (!findRegion(sigCd)) return fail(404, "REGION_NOT_FOUND", "없는 지역이에요.");
+  const bbox = query.get("bbox");
+  let box: number[] | null = null;
+  if (bbox) {
+    box = bbox.split(",").map(Number);
+    const [minLng, minLat, maxLng, maxLat] = box;
+    const ok = box.length === 4 && box.every(Number.isFinite) && minLng < maxLng && minLat < maxLat && minLat >= 33 && maxLat <= 39 && minLng >= 124 && maxLng <= 132;
+    if (!ok) return fail(400, "ATTRACTION_INVALID_BOUNDS", "지도 범위가 올바르지 않아요.");
+  }
+  const category = query.get("category");
+  const items = attractionsFor(sigCd)
+    .filter((a) => !box || (a.lng >= box[0] && a.lat >= box[1] && a.lng <= box[2] && a.lat <= box[3]))
+    .filter((a) => !category || a.category === category)
+    .map((a) => ({ attractionId: a.attractionId, name: a.name, thumbnailUrl: null, category: a.category, lat: a.lat, lng: a.lng, recommendable: recommendableMock(a.name) }));
+  return ok({ items, nextCursor: null });
+});
+
+on("GET", "/attractions/:id", (_ctx, [id]) => {
+  const a = findAttraction(Number(id));
+  if (!a) return fail(404, "ATTRACTION_NOT_FOUND", "없는 관광지예요.");
+  const recommendable = recommendableMock(a.name);
+  return ok({
+    attractionId: a.attractionId,
+    regionSigCd: a.sigCd,
+    name: a.name,
+    category: a.category,
+    address: a.address,
+    lat: a.lat,
+    lng: a.lng,
+    description: `${a.name}은(는) 목업 관광지예요. 실제 서버에서는 한국관광공사 원천 설명이 이 자리에 옵니다.`,
+    images: [],
+    useTime: "09:00~18:00",
+    restDate: "매주 월요일",
+    estimatedDurationMinutes: a.durationMinutes,
+    estimated: true,
+    recommendable,
+    notRecommendableReasons: recommendable ? [] : ["MISSING_IMAGE"],
+    sources: [{ name: "한국관광공사 TourAPI", contentId: String(a.attractionId), fetchedAt: "2026-10-01T00:00:00" }],
+    oneLine: a.oneLine,
+    tags: [],
+    summaryBasis: "SOURCE_SUMMARY",
+  });
+});
 
 // ── 코스 공유 링크 (4-9~4-13) ──
 const SHARE_LINK_CODES = { notFound: "SHARE_LINK_NOT_FOUND", revoked: "SHARE_LINK_REVOKED", expired: "SHARE_LINK_EXPIRED" };
