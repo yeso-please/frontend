@@ -1,6 +1,7 @@
 import { BottomSheetBackdrop, type BottomSheetBackdropProps, BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
+import { router } from "expo-router";
 import { Alert, StyleSheet, TextInput, View } from "react-native";
 import Animated, { FadeInDown, FadeOut, LinearTransition } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -146,6 +147,16 @@ export default function FriendsScreen() {
               </AppText>
             </View>
           </View>
+          <Button
+            label="여행 지도 보기"
+            variant="secondary"
+            height={48}
+            onPress={() => {
+              const friend = selected;
+              sheetRef.current?.dismiss();
+              if (friend) router.push({ pathname: "/my/friend-map/[userId]", params: { userId: String(friend.userId), nickname: friend.nickname } });
+            }}
+          />
           <Button label="친구 끊기" variant="outline" labelColor="charcoal" onPress={confirmDisconnect} style={styles.disconnect} />
           <Button label="닫기" variant="secondary" height={48} onPress={() => sheetRef.current?.dismiss()} />
         </BottomSheetView>

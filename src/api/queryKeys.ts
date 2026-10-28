@@ -23,4 +23,7 @@ export const queryKeys = {
   inviteCourse: (token: string) => ["invites", token, "course"] as const,
   friends: ["friends"] as const,
   friendLink: (token: string) => ["friend-links", token] as const,
+  diary: (diaryId: number) => ["diaries", diaryId] as const,
+  myTravelMap: ["me", "travel-map"] as const,
+  friendTravelMap: (userId: number) => ["friends", userId, "travel-map"] as const,
 };

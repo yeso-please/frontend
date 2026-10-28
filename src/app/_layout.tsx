@@ -53,11 +53,13 @@ export default function RootLayout() {
           <Stack.Screen name="trip" />
           <Stack.Screen name="invites" />
           <Stack.Screen name="survey" options={{ animation: "slide_from_bottom" }} />
+          <Stack.Screen name="diary" />
           <Stack.Screen name="my" />
         </Stack.Protected>
         {/* 초대 링크(tripin://invite/{token})·친구 초대 링크(tripin://friend/{token})는 로그인 전에도 열립니다 — 미리보기는 공개 API (4-4·4-16·2-7) */}
         <Stack.Screen name="invite" />
         <Stack.Screen name="friend/[token]" />
+        <Stack.Screen name="diary-link/[token]" />
       </Stack>
     </AppProviders>
   );

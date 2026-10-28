@@ -462,6 +462,69 @@ export type RouteLeg = {
 };
 export type CourseRoutes = { tripId: number; version: number; dayIndex: number; transport: Transport; legs: RouteLeg[] };
 
+// ── 여행기·여행 지도 (6장) ──
+export type DiaryStatus = "DRAFT" | "PUBLISHED";
+/** PRIVATE 나만 · FRIENDS 수락된 친구 · LINK 공유 링크 소지자 */
+export type DiaryVisibility = "PRIVATE" | "FRIENDS" | "LINK";
+/** 남에게 보일 사진 위치: EXACT 그대로 · CITY 지역 중심 · HIDDEN 숨김 (작성자에게는 항상 원래 위치) */
+export type LocationPrecision = "EXACT" | "CITY" | "HIDDEN";
+export type DiaryPhoto = {
+  photoId: number;
+  url: string;
+  thumbnailUrl: string;
+  takenAt: string | null;
+  lat: number | null;
+  lng: number | null;
+  order: number;
+};
+export type Diary = {
+  diaryId: number;
+  tripId: number;
+  status: DiaryStatus;
+  title: string;
+  body: string | null;
+  courseTitle: string | null;
+  regionSigCd: string | null;
+  visitedFrom: string;
+  visitedTo: string;
+  visibility: DiaryVisibility;
+  locationPrecision: LocationPrecision;
+  satisfaction: number | null;
+  experienceTags: string[];
+  /** 작성자에게만 옵니다 */
+  includeInTasteProfile?: boolean;
+  coverPhotoId: number | null;
+  photos: DiaryPhoto[];
+  publishedAt: string | null;
+  updatedAt: string;
+};
+export type DiaryUpdate = Partial<{
+  title: string;
+  body: string;
+  visibility: DiaryVisibility;
+  locationPrecision: LocationPrecision;
+  satisfaction: number | null;
+  experienceTags: string[];
+  includeInTasteProfile: boolean;
+  coverPhotoId: number;
+  photoOrder: number[];
+}>;
+/** 6-7·6-8 지도 핀 — 대표 사진 위치, 없으면 지역 중심 */
+export type TravelMapPin = {
+  diaryId: number;
+  title: string;
+  courseTitle: string | null;
+  coverPhotoUrl: string | null;
+  visitedAt: string;
+  regionSigCd: string | null;
+  regionName: string | null;
+  lat: number;
+  lng: number;
+  locationPrecision: LocationPrecision;
+  visibility: DiaryVisibility;
+  status: DiaryStatus;
+};
+
 // ── 오류 ──
 export type ApiErrorBody = {
   timestamp?: string;

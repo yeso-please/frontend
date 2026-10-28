@@ -29,7 +29,9 @@ const buildPath = (path: string, query?: RequestOptions["query"]) => {
 
 async function send(method: Method, path: string, body: unknown, token: string | null, timeoutMs = REQUEST_TIMEOUT_MS): Promise<RawResponse> {
   const headers: Record<string, string> = { Accept: "application/json" };
-  if (body !== undefined) headers["Content-Type"] = "application/json";
+  // FormData(사진 올리기)는 fetch가 multipart 경계를 담은 Content-Type을 직접 붙입니다.
+  const isForm = typeof FormData !== "undefined" && body instanceof FormData;
+  if (body !== undefined && !isForm) headers["Content-Type"] = "application/json";
   if (token) headers.Authorization = `Bearer ${token}`;
 
   if (USE_MOCK) return mockFetch(method, path, body, headers);
@@ -41,7 +43,7 @@ async function send(method: Method, path: string, body: unknown, token: string |
     const res = await fetch(`${API_BASE_URL}${path}`, {
       method,
       headers,
-      body: body === undefined ? undefined : JSON.stringify(body),
+      body: body === undefined ? undefined : isForm ? (body as FormData) : JSON.stringify(body),
       credentials: "include",
       signal: controller.signal,
     });

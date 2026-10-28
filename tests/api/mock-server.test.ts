@@ -5,6 +5,7 @@ import type {
   AuthResponse,
   Course,
   CourseRoutes,
+  Diary,
   DrawResult,
   OnboardingQuestions,
   OnboardingSubmission,
@@ -15,6 +16,7 @@ import type {
   RegionList,
   RegionMatch,
   RestaurantRecommendations,
+  TravelMapPin,
   TripContext,
   TripSummary,
 } from "@/api/types";
@@ -615,5 +617,56 @@ describe("친구 초대 링크 (2-4·2-7·2-8)", () => {
     const res = await call("GET", "/friend-links/by-token/iv_abc");
     expect(res.status).toBe(400);
     expect(res.json.code).toBe("TOKEN_AUDIENCE_MISMATCH");
+  });
+});
+
+describe("여행기·여행 지도 (6장)", () => {
+  it("끝나지 않은 여행은 TRIP_NOT_ENDED, 지난 여행은 초안 → 사진 → 발행 → 지도 핀", async () => {
+    const { token } = await onboarded();
+    const upcoming = (await createTrip(token, { regionSigCd: "51150", regionSelection: "RANDOM" })).json;
+    expect((await call("POST", `/courses/${upcoming.id}/diary`, undefined, token)).json.code).toBe("TRIP_NOT_ENDED");
+
+    const past = (await createTrip(token, { startDate: inDays(-20), nights: 1, regionSigCd: "51150", regionSelection: "RANDOM" })).json;
+    expect(past.retroactive).toBe(true);
+    const created = await call<Diary>("POST", `/courses/${past.id}/diary`, undefined, token);
+    expect(created.status).toBe(201);
+    expect(created.json.status).toBe("DRAFT");
+    expect(created.json.includeInTasteProfile).toBe(true);
+    const id = created.json.diaryId;
+
+    const again = await call("POST", `/courses/${past.id}/diary`, undefined, token);
+    expect(again.json.code).toBe("DIARY_ALREADY_EXISTS_FOR_TRIP");
+
+    const form = new FormData();
+    form.append("files", new Blob(["x"], { type: "image/jpeg" }), "a.jpg");
+    form.append("files", new Blob(["y"], { type: "image/jpeg" }), "b.jpg");
+    const up = await call<{ photos: { photoId: number }[] }>("POST", `/diaries/${id}/photos`, form, token);
+    expect(up.json.photos).toHaveLength(2);
+
+    expect((await call("PATCH", `/diaries/${id}`, { experienceTags: ["없는태그"] }, token)).status).toBe(400);
+    const patched = await call<Diary>("PATCH", `/diaries/${id}`, { title: "  바다 여행  ", satisfaction: 5, experienceTags: ["바다", "카페"], visibility: "FRIENDS" }, token);
+    expect(patched.json.title).toBe("바다 여행");
+    expect(patched.json.coverPhotoId).toBe(up.json.photos[0].photoId);
+
+    const published = await call<Diary>("POST", `/diaries/${id}/publish`, undefined, token);
+    expect(published.json.status).toBe("PUBLISHED");
+
+    const pins = await call<TravelMapPin[]>("GET", "/me/travel-map", undefined, token);
+    expect(pins.json.map((p) => p.diaryId)).toEqual([id]);
+    expect(pins.json[0].coverPhotoUrl).toBeTruthy();
+    const trips = await call<TripSummary[]>("GET", "/trips?period=PAST", undefined, token);
+    expect(trips.json.find((t) => t.tripId === past.id)?.myDiaryId).toBe(id);
+
+    expect((await call("POST", `/diaries/${id}/share-links`, { expiresInDays: 7 }, token)).json.code).toBe("DIARY_NOT_PUBLISHABLE");
+    await call("PATCH", `/diaries/${id}`, { visibility: "LINK" }, token);
+    expect((await call("POST", `/diaries/${id}/share-links`, { expiresInDays: 7 }, token)).status).toBe(201);
+
+    expect((await call("DELETE", `/diaries/${id}`, undefined, token)).status).toBe(204);
+    expect((await call<TravelMapPin[]>("GET", "/me/travel-map", undefined, token)).json).toEqual([]);
+  });
+
+  it("친구가 아닌 회원의 여행 지도는 FRIEND_REQUIRED", async () => {
+    const { token } = await onboarded();
+    expect((await call("GET", "/friends/999/travel-map", undefined, token)).json.code).toBe("FRIEND_REQUIRED");
   });
 });

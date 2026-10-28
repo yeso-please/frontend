@@ -1,3 +1,5 @@
+import { File } from "expo-file-system";
+
 import { api } from "./client";
 import type {
   Alternatives,
@@ -11,6 +13,9 @@ import type {
   DateRange,
   DecideRegionRequest,
   DecideRegionResponse,
+  Diary,
+  DiaryPhoto,
+  DiaryUpdate,
   DrawRequest,
   DrawResult,
   Friend,
@@ -39,6 +44,7 @@ import type {
   SentFriendInvite,
   TasteMode,
   Transport,
+  TravelMapPin,
   TripContext,
   TripSummary,
 } from "./types";
@@ -133,4 +139,35 @@ export const friendApi = {
   /** 2-8 수락하면 바로 친구가 됩니다 (이미 친구면 200, 같은 응답) */
   acceptLink: (token: string) => api.post<Friend>(`/friend-links/by-token/${token}/accept`),
   remove: (userId: number) => api.delete(`/friends/${userId}`),
+};
+
+/** 사진 한 장 — expo-image-picker 결과의 uri·mimeType·fileName */
+export type UploadFile = { uri: string; name: string; type: string };
+
+export const diaryApi = {
+  /** 6-1 끝난 여행에 내 여행기(초안)를 만듭니다. 여행마다 하나 */
+  create: (tripId: number, title?: string) => api.post<Diary>(`/courses/${tripId}/diary`, title ? { title } : undefined),
+  get: (diaryId: number) => api.get<Diary>(`/diaries/${diaryId}`),
+  /** 6-4 보낸 필드만 바꿉니다 */
+  update: (diaryId: number, body: DiaryUpdate) => api.patch<Diary>(`/diaries/${diaryId}`, body),
+  /** 6-2 JPEG·PNG·WebP, 장당 10MB, 여행기 전체 30장. 한 장이라도 실패하면 전부 저장하지 않습니다 */
+  uploadPhotos: (diaryId: number, files: UploadFile[]) => {
+    const form = new FormData();
+    // SDK 57의 전역 fetch(expo/fetch)는 RN식 {uri, name, type} 파트를 보내지 못합니다 — expo-file-system의 File로 넣습니다.
+    for (const f of files) form.append("files", new File(f.uri));
+    return api.post<{ photos: DiaryPhoto[] }>(`/diaries/${diaryId}/photos`, form, { timeoutMs: 120000 });
+  },
+  deletePhoto: (diaryId: number, photoId: number) => api.delete(`/diaries/${diaryId}/photos/${photoId}`),
+  /** 6-5 제목만 있으면 발행됩니다 (사진은 없어도 됨) */
+  publish: (diaryId: number) => api.post<Diary>(`/diaries/${diaryId}/publish`),
+  remove: (diaryId: number) => api.delete(`/diaries/${diaryId}`),
+  /** 6-9 발행됐고 공개 범위가 LINK일 때만 */
+  issueShareLink: (diaryId: number, expiresInDays = 7) => api.post<IssuedLink>(`/diaries/${diaryId}/share-links`, { expiresInDays }),
+};
+
+export const travelMapApi = {
+  /** 6-7 내 여행기 핀 (초안 포함) */
+  mine: (range?: { from?: string; to?: string }) => api.get<TravelMapPin[]>("/me/travel-map", { query: range }),
+  /** 6-8 친구의 발행된 FRIENDS 공개 여행기만 */
+  friend: (userId: number) => api.get<TravelMapPin[]>(`/friends/${userId}/travel-map`),
 };

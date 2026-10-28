@@ -5,6 +5,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import personas from "@/features/mbti/travel-personas.json";
 
 import type {
+  Diary,
   AuthResponse,
   DrawCondition,
   DrawResult,
@@ -52,8 +53,12 @@ type MockDb = {
   removedFriends: Record<number, number[]>;
   /** 받은 초대 시연용 친구 여행을 이미 만들어 준 회원 */
   seededFor: number[];
+  diaries: MockDiary[];
   seq: number;
 };
+
+/** 여행기 (6장). ownerId·지역 중심은 응답에 넣지 않습니다 */
+type MockDiary = Diary & { ownerId: number; includeInTasteProfile: boolean; regionName: string | null; regionLat: number | null; regionLng: number | null };
 
 // v3: 지역 먼저 흐름·코스·변경 기록·접속 표시 반영. 이전 목업 데이터와 모양이 달라 새 키를 씁니다.
 const STORAGE_KEY = "tripin.mock.db.v3";
@@ -81,6 +86,7 @@ const seedDb = (): MockDb => ({
   invites: [],
   removedFriends: {},
   seededFor: [],
+  diaries: [],
   seq: 100,
 });
 
@@ -559,7 +565,7 @@ on("GET", "/trips", ({ db: d, me, query }) => {
         participants: t.participants.map((id) => userRef(d, id)),
         hasCourse: t.hasCourse,
         retroactive: t.retroactive,
-        myDiaryId: null,
+        myDiaryId: d.diaries.find((x) => x.tripId === t.id && x.ownerId === me!.id)?.diaryId ?? null,
         updatedAt: d.courses[t.id]?.updatedAt ?? nowIso(),
       })),
   );
@@ -1013,6 +1019,182 @@ on("POST", "/friend-links/by-token/:token/accept", ({ db: d, me }, [t]) => {
   const already = !removed.includes(owner.userId);
   d.removedFriends[me!.id] = removed.filter((id) => id !== owner.userId);
   return ok(owner, already ? 200 : 201);
+});
+
+// ── 여행기·여행 지도 (6장) ──
+const DIARY_TAGS = new Set(["자연", "바다", "산", "산책", "골목", "역사", "시장", "로컬 음식", "카페", "휴식", "실내", "체험"]);
+const DIARY_FIELDS = ["body", "visibility", "locationPrecision", "satisfaction", "experienceTags", "includeInTasteProfile", "coverPhotoId"] as const;
+
+const diaryView = (x: MockDiary, owner: boolean): Diary => {
+  const { ownerId: _o, regionName: _r, regionLat: _la, regionLng: _ln, includeInTasteProfile, ...rest } = x;
+  return owner ? { ...rest, includeInTasteProfile } : rest;
+};
+const findMyDiary = (d: MockDb, me: MockUser, id: string) => {
+  const diary = d.diaries.find((x) => x.diaryId === Number(id) && x.ownerId === me.id);
+  if (!diary) throw new MockError(404, "DIARY_NOT_FOUND", "여행기를 찾을 수 없어요.");
+  return diary;
+};
+const pinOf = (x: MockDiary) => {
+  const cover = x.photos.find((p) => p.photoId === x.coverPhotoId) ?? null;
+  return {
+    diaryId: x.diaryId,
+    title: x.title,
+    courseTitle: x.courseTitle,
+    coverPhotoUrl: cover?.thumbnailUrl ?? null,
+    visitedAt: x.visitedFrom,
+    regionSigCd: x.regionSigCd,
+    regionName: x.regionName,
+    lat: cover?.lat ?? x.regionLat ?? 36.5,
+    lng: cover?.lng ?? x.regionLng ?? 127.8,
+    locationPrecision: x.locationPrecision,
+    visibility: x.visibility,
+    status: x.status,
+  };
+};
+const invalidDiaryPatch = (diary: MockDiary, b: Record<string, unknown>): string | null => {
+  if (b.title !== undefined && (typeof b.title !== "string" || b.title.trim().length < 1 || b.title.trim().length > 60)) return "제목은 1~60자예요.";
+  if (b.body !== undefined && (typeof b.body !== "string" || b.body.length > 5000)) return "본문은 5000자까지예요.";
+  const sat = b.satisfaction;
+  if (sat !== undefined && sat !== null && !(Number.isInteger(sat) && (sat as number) >= 1 && (sat as number) <= 5)) return "만족도는 1~5예요.";
+  const tags = b.experienceTags;
+  if (tags !== undefined && (!Array.isArray(tags) || tags.length > 5 || tags.some((t) => !DIARY_TAGS.has(t as string)))) return "경험 태그는 사전 안에서 5개까지예요.";
+  if (b.photoOrder !== undefined) {
+    const ids = diary.photos.map((p) => p.photoId).sort((a, c) => a - c);
+    const order = [...(b.photoOrder as number[])].sort((a, c) => a - c);
+    if (ids.join() !== order.join()) return "사진 순서가 올바르지 않아요.";
+  }
+  return null;
+};
+
+on("POST", "/courses/:id/diary", ({ db: d, me, body }, [id]) => {
+  const trip = findTrip(d, me!, id);
+  if (!isEnded(trip)) return fail(409, "TRIP_NOT_ENDED", "여행이 끝난 뒤에 여행기를 쓸 수 있어요.");
+  const existing = d.diaries.find((x) => x.tripId === trip.id && x.ownerId === me!.id);
+  if (existing) return fail(409, "DIARY_ALREADY_EXISTS_FOR_TRIP", "이 여행의 여행기가 이미 있어요.", { details: { diaryId: existing.diaryId } });
+  const region = findRegion(trip.regionSigCd);
+  const courseTitle = d.courses[trip.id]?.title ?? null;
+  const requested = typeof body?.title === "string" ? body.title.trim() : "";
+  const diary: MockDiary = {
+    diaryId: ++d.seq,
+    tripId: trip.id,
+    status: "DRAFT",
+    title: requested || courseTitle || `${trip.startDate} 여행`,
+    body: null,
+    courseTitle,
+    regionSigCd: trip.regionSigCd,
+    visitedFrom: trip.startDate,
+    visitedTo: trip.endDate,
+    visibility: "PRIVATE",
+    locationPrecision: "CITY",
+    satisfaction: null,
+    experienceTags: [],
+    includeInTasteProfile: true,
+    coverPhotoId: null,
+    photos: [],
+    publishedAt: null,
+    updatedAt: nowIso(),
+    ownerId: me!.id,
+    regionName: regionName(trip.regionSigCd),
+    regionLat: region?.centerLat ?? null,
+    regionLng: region?.centerLng ?? null,
+  };
+  d.diaries.push(diary);
+  return ok(diaryView(diary, true), 201);
+});
+
+on("GET", "/diaries/:id", ({ db: d, me }, [id]) => {
+  const diary = d.diaries.find((x) => x.diaryId === Number(id));
+  if (!diary) return fail(404, "DIARY_NOT_FOUND", "여행기를 찾을 수 없어요.");
+  if (diary.ownerId === me!.id) return ok(diaryView(diary, true));
+  const friend = friendsOf(d, me!).some((f) => f.userId === diary.ownerId);
+  if (friend && diary.status === "PUBLISHED" && diary.visibility === "FRIENDS") return ok(diaryView(diary, false));
+  return fail(404, "DIARY_NOT_FOUND", "여행기를 찾을 수 없어요.");
+});
+
+on("PATCH", "/diaries/:id", ({ db: d, me, body }, [id]) => {
+  const diary = findMyDiary(d, me!, id);
+  const b = (body ?? {}) as Record<string, unknown>;
+  const invalid = invalidDiaryPatch(diary, b);
+  if (invalid) return fail(400, "COMMON_INVALID_REQUEST", invalid);
+  if (b.coverPhotoId !== undefined && !diary.photos.some((p) => p.photoId === b.coverPhotoId)) return fail(404, "DIARY_PHOTO_NOT_FOUND", "이 여행기의 사진이 아니에요.");
+  if (b.photoOrder !== undefined) {
+    diary.photos = (b.photoOrder as number[]).map((pid, i) => ({ ...diary.photos.find((p) => p.photoId === pid)!, order: i }));
+  }
+  for (const k of DIARY_FIELDS) {
+    if (b[k] !== undefined) (diary as unknown as Record<string, unknown>)[k] = b[k];
+  }
+  if (typeof b.title === "string") diary.title = b.title.trim();
+  diary.updatedAt = nowIso();
+  return ok(diaryView(diary, true));
+});
+
+on("POST", "/diaries/:id/photos", ({ db: d, me, body }, [id]) => {
+  const diary = findMyDiary(d, me!, id);
+  const form = body as { getAll?: (k: string) => unknown[] } | undefined;
+  const count = typeof form?.getAll === "function" ? form.getAll("files").length : 1;
+  if (count < 1) return fail(400, "DIARY_PHOTO_INVALID", "사진을 골라 주세요.", { details: { fileIndex: 0 } });
+  if (diary.photos.length + count > 30) return fail(400, "DIARY_PHOTO_LIMIT_EXCEEDED", "사진은 30장까지예요.");
+  const added = Array.from({ length: count }, (_, i) => {
+    const photoId = ++d.seq;
+    return {
+      photoId,
+      url: `https://picsum.photos/seed/tripin-${photoId}/900/900`,
+      thumbnailUrl: `https://picsum.photos/seed/tripin-${photoId}/300/300`,
+      takenAt: null,
+      lat: null,
+      lng: null,
+      order: diary.photos.length + i,
+    };
+  });
+  diary.photos.push(...added);
+  diary.coverPhotoId ??= added[0].photoId;
+  diary.updatedAt = nowIso();
+  return ok({ photos: added }, 201);
+});
+
+on("DELETE", "/diaries/:id/photos/:photoId", ({ db: d, me }, [id, photoId]) => {
+  const diary = findMyDiary(d, me!, id);
+  if (!diary.photos.some((p) => p.photoId === Number(photoId))) return fail(404, "DIARY_PHOTO_NOT_FOUND", "이 여행기의 사진이 아니에요.");
+  diary.photos = diary.photos.filter((p) => p.photoId !== Number(photoId));
+  if (diary.coverPhotoId === Number(photoId)) diary.coverPhotoId = diary.photos[0]?.photoId ?? null;
+  return ok(null, 204);
+});
+
+on("POST", "/diaries/:id/publish", ({ db: d, me }, [id]) => {
+  const diary = findMyDiary(d, me!, id);
+  if (!diary.title.trim()) return fail(422, "DIARY_NOT_PUBLISHABLE", "제목이 필요해요.", { details: { missing: ["TITLE"] } });
+  if (diary.status !== "PUBLISHED") {
+    diary.status = "PUBLISHED";
+    diary.publishedAt = nowIso();
+  }
+  return ok(diaryView(diary, true));
+});
+
+on("DELETE", "/diaries/:id", ({ db: d, me }, [id]) => {
+  const diary = findMyDiary(d, me!, id);
+  d.diaries = d.diaries.filter((x) => x !== diary);
+  return ok(null, 204);
+});
+
+on("POST", "/diaries/:id/share-links", ({ db: d, me }, [id]) => {
+  const diary = findMyDiary(d, me!, id);
+  const missing = [...(diary.status === "PUBLISHED" ? [] : ["PUBLISHED"]), ...(diary.visibility === "LINK" ? [] : ["VISIBILITY_LINK"])];
+  if (missing.length > 0) return fail(422, "DIARY_NOT_PUBLISHABLE", "발행하고 링크 공개로 바꿔 주세요.", { details: { missing } });
+  return ok({ id: ++d.seq, token: token("dl_"), expiresAt: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 19), createdAt: nowIso() }, 201);
+});
+
+on("GET", "/me/travel-map", ({ db: d, me }) =>
+  ok(
+    d.diaries
+      .filter((x) => x.ownerId === me!.id)
+      .sort((a, c) => a.visitedFrom.localeCompare(c.visitedFrom))
+      .map(pinOf),
+  ),
+);
+
+on("GET", "/friends/:userId/travel-map", ({ db: d, me }, [userId]) => {
+  if (!friendsOf(d, me!).some((f) => f.userId === Number(userId))) return fail(403, "FRIEND_REQUIRED", "친구만 볼 수 있어요.");
+  return ok(d.diaries.filter((x) => x.ownerId === Number(userId) && x.status === "PUBLISHED" && x.visibility === "FRIENDS").map(pinOf));
 });
 
 // ── 진입점 ──
