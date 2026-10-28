@@ -15,7 +15,18 @@ export const KAKAO_ENABLED = USE_MOCK || (!!KAKAO_REST_API_KEY && !!KAKAO_REDIRE
 export const KAKAO_JS_KEY = process.env.EXPO_PUBLIC_KAKAO_JS_KEY ?? "";
 export const KAKAO_MAP_ORIGIN = process.env.EXPO_PUBLIC_KAKAO_MAP_ORIGIN ?? "http://localhost:8080";
 
-/** 공유·초대 링크의 앱 딥링크 주소 (예: tripin://invite/iv_xxx). 웹 도메인이 생기면 교체합니다. */
+/** 앱 딥링크 주소 (예: tripin://invite/iv_xxx) */
 export const LINK_BASE_URL = "tripin://";
+/**
+ * 서버가 https(AWS CloudFront)면 그 웹 주소. 같은 도메인의 안내 페이지(/invite/{token} 등)가 앱을 열고, 앱이 없으면 앱 받기로 보냅니다.
+ * 로컬·목업 서버면 null입니다.
+ */
+export const PUBLIC_WEB_URL = !USE_MOCK && API_BASE_URL.startsWith("https://") ? API_BASE_URL.replace(/\/api\/?$/, "") : null;
+
+/**
+ * 남에게 보내는 링크. 카카오톡 같은 메신저는 tripin:// 주소를 누를 수 없어서, 웹 주소가 있으면 https 안내 페이지 주소로 보냅니다.
+ * path는 앱 경로와 같습니다: invite/{token}, friend/{token}, course/{token}, diary-link/{token}
+ */
+export const shareUrl = (path: string) => (PUBLIC_WEB_URL ? `${PUBLIC_WEB_URL}/${path}` : `${LINK_BASE_URL}${path}`);
 
 export const REQUEST_TIMEOUT_MS = 15000;

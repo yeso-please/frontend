@@ -14,6 +14,7 @@ import type {
   DecideRegionRequest,
   DecideRegionResponse,
   Diary,
+  DiaryLinkSummary,
   DiaryPhoto,
   DiaryUpdate,
   DrawRequest,
@@ -21,6 +22,7 @@ import type {
   Friend,
   FriendLinkPreview,
   FriendInvite,
+  FriendLinkSummary,
   GenerateCourseRequest,
   InvitePreview,
   IssuedLink,
@@ -100,6 +102,8 @@ export const tripApi = {
 export const inviteApi = {
   issue: (tripId: number, expiresInDays = 7) => api.post<IssuedLink>(`/trips/${tripId}/invites`, { expiresInDays }),
   list: (tripId: number) => api.get<LinkSummary[]>(`/trips/${tripId}/invites`),
+  /** 4-3 이후 수락을 막습니다. 이미 참여한 사람은 그대로 */
+  revoke: (tripId: number, inviteId: number) => api.delete(`/trips/${tripId}/invites/${inviteId}`),
   preview: (token: string) => api.get<InvitePreview>(`/invites/${token}`, { auth: false }),
   /** 4-16 수락 전 코스 둘러보기 (로그인 불필요, 읽기 전용) */
   course: (token: string) => api.get<Course>(`/invites/${token}/course`, { auth: false }),
@@ -139,6 +143,20 @@ export const friendApi = {
   /** 2-8 수락하면 바로 친구가 됩니다 (이미 친구면 200, 같은 응답) */
   acceptLink: (token: string) => api.post<Friend>(`/friend-links/by-token/${token}/accept`),
   remove: (userId: number) => api.delete(`/friends/${userId}`),
+  /** 2-5 만료·폐기된 링크도 포함, 최신순 */
+  links: () => api.get<FriendLinkSummary[]>("/friend-links"),
+  /** 2-6 이후 수락을 막습니다. 이미 맺은 친구는 그대로 */
+  revokeLink: (id: number) => api.delete(`/friend-links/${id}`),
+};
+
+/** 4-9~4-13 코스 읽기 전용 공유 링크 — 참여하지 않은 사람에게 코스를 보여 줍니다 (참여자 이름은 감춰짐) */
+export const courseShareApi = {
+  issue: (tripId: number, expiresInDays = 7) => api.post<IssuedLink>(`/courses/${tripId}/share-links`, { expiresInDays }),
+  list: (tripId: number) => api.get<LinkSummary[]>(`/courses/${tripId}/share-links`),
+  /** 4-11 이미 열린 세션도 바로 무효 */
+  revoke: (tripId: number, linkId: number) => api.delete(`/courses/${tripId}/share-links/${linkId}`),
+  /** 4-12 공개 — token을 cookie로 바꾸고 303으로 4-13(공유 코스)을 돌려줍니다. fetch가 따라가 Course를 받습니다 */
+  open: (token: string) => api.get<Course>(`/shared/courses/${token}`, { auth: false }),
 };
 
 /** 사진 한 장 — expo-image-picker 결과의 uri·mimeType·fileName */
@@ -163,6 +181,9 @@ export const diaryApi = {
   remove: (diaryId: number) => api.delete(`/diaries/${diaryId}`),
   /** 6-9 발행됐고 공개 범위가 LINK일 때만 */
   issueShareLink: (diaryId: number, expiresInDays = 7) => api.post<IssuedLink>(`/diaries/${diaryId}/share-links`, { expiresInDays }),
+  shareLinks: (diaryId: number) => api.get<DiaryLinkSummary[]>(`/diaries/${diaryId}/share-links`),
+  /** 6-10 이미 열린 세션도 바로 무효 */
+  revokeShareLink: (diaryId: number, linkId: number) => api.delete(`/diaries/${diaryId}/share-links/${linkId}`),
 };
 
 export const travelMapApi = {

@@ -38,6 +38,8 @@ type MockTrip = TripContext & {
 };
 type MockFriendInvite = { id: number; tripId: number; invitee: UserRef; inviter: UserRef; status: FriendInviteStatus; createdAt: string };
 type MockInviteLink = { id: number; tripId: number; token: string; createdBy: number; expiresAt: string; createdAt: string; revoked: boolean };
+/** 친구 초대 링크(2-4)·코스 공유 링크(4-9)·여행기 공유 링크(6-9). ownerId는 회원·여행·여행기 ID */
+type MockLink = { id: number; ownerId: number; token: string; createdBy: number; expiresAt: string; createdAt: string; revoked: boolean; acceptedCount: number };
 type MockDb = {
   users: MockUser[];
   /** refresh 쿠키의 주인 (POST /auth/refresh) */
@@ -50,6 +52,9 @@ type MockDb = {
   courses: Record<number, MockCourse>;
   friendInvites: MockFriendInvite[];
   invites: MockInviteLink[];
+  friendLinks: MockLink[];
+  courseLinks: MockLink[];
+  diaryLinks: MockLink[];
   removedFriends: Record<number, number[]>;
   /** 받은 초대 시연용 친구 여행을 이미 만들어 준 회원 */
   seededFor: number[];
@@ -84,6 +89,9 @@ const seedDb = (): MockDb => ({
   courses: {},
   friendInvites: [],
   invites: [],
+  friendLinks: [],
+  courseLinks: [],
+  diaryLinks: [],
   removedFriends: {},
   seededFor: [],
   diaries: [],
@@ -761,6 +769,55 @@ on("GET", "/invites/:token/course", ({ db: d }, [value]) => {
   return ok(toCourse(trip, d.courses[trip.id] ?? null, { role: "VIEWER" }));
 }, { auth: false });
 
+// ── 코스 공유 링크 (4-9~4-13) ──
+const SHARE_LINK_CODES = { notFound: "SHARE_LINK_NOT_FOUND", revoked: "SHARE_LINK_REVOKED", expired: "SHARE_LINK_EXPIRED" };
+
+on("POST", "/courses/:id/share-links", ({ db: d, me, body }, [id]) => {
+  const trip = findTrip(d, me!, id);
+  const link = newLink(d, "sl_", trip.id, me!.id, daysOf(body));
+  d.courseLinks.push(link);
+  return issued(link);
+});
+
+on("GET", "/courses/:id/share-links", ({ db: d, me }, [id]) => {
+  const trip = findTrip(d, me!, id);
+  return ok(
+    d.courseLinks
+      .filter((l) => l.ownerId === trip.id)
+      .sort((a, b) => b.id - a.id)
+      .map((l) => ({ id: l.id, expiresAt: l.expiresAt, revoked: l.revoked, createdBy: userRef(d, l.createdBy), createdAt: l.createdAt })),
+  );
+});
+
+on("DELETE", "/courses/:id/share-links/:linkId", ({ db: d, me }, [id, linkId]) => {
+  const trip = findTrip(d, me!, id);
+  const link = d.courseLinks.find((l) => l.id === Number(linkId) && l.ownerId === trip.id);
+  if (!link) return fail(404, "SHARE_LINK_NOT_FOUND", "없는 공유 링크예요.");
+  link.revoked = true;
+  return ok(null, 204);
+});
+
+// 실제 서버는 303으로 cookie를 심고 4-13을 돌려줍니다. 목업은 바로 공유 코스를 줍니다.
+on("GET", "/shared/courses/:token", ({ db: d }, [value]) => {
+  const link = linkByToken(d.courseLinks, value, "sl_", SHARE_LINK_CODES);
+  const trip = d.trips.find((t) => t.id === link.ownerId);
+  if (!trip) return fail(404, "SHARE_LINK_NOT_FOUND", "없는 공유 링크예요.");
+  const course = toCourse(trip, d.courses[trip.id] ?? null, { role: "VIEWER" });
+  // 참여자 닉네임과 본인 전용 이유는 감춥니다
+  return ok({
+    ...course,
+    tasteBasis: null,
+    updatedBy: null,
+    changes: course.changes
+      ? { ...course.changes, removed: course.changes.removed.map((r) => ({ ...r, removedBy: null })), latest: course.changes.latest ? { ...course.changes.latest, by: null } : null }
+      : null,
+    days: course.days.map((day) => ({
+      ...day,
+      items: day.items.map((it) => (it.type === "ATTRACTION" ? { ...it, personalReason: null, change: it.change ? { ...it.change, by: null } : it.change } : it)),
+    })),
+  });
+}, { auth: false });
+
 /** 4-5·4-8 공통 수락 조건: 설문 완료, 끝나지 않은 여행, 8명 미만, 내 여행과 날짜가 겹치지 않음 */
 function acceptInto(d: MockDb, me: MockUser, trip: MockTrip) {
   if (!d.submissions[me.id]) throw new MockError(409, "ONBOARDING_REQUIRED", "취향 설문을 먼저 마쳐 주세요.");
@@ -1003,20 +1060,71 @@ on("DELETE", "/friends/:userId", ({ db: d, me }, [userId]) => {
   return ok(null, 204);
 });
 
-on("POST", "/friend-links", ({ db: d }) => ok({ id: ++d.seq, token: token("fl_"), expiresAt: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 19), createdAt: nowIso() }, 201));
+const daysOf = (body: Record<string, unknown> | undefined) => {
+  const days = Number(body?.expiresInDays ?? 7);
+  if (!Number.isInteger(days) || days < 1 || days > 30) throw new MockError(400, "INVALID_EXPIRES_IN_DAYS", "만료 기간은 1~30일입니다.");
+  return days;
+};
+const newLink = (d: MockDb, prefix: string, ownerId: number, createdBy: number, days: number): MockLink => ({
+  id: ++d.seq,
+  ownerId,
+  token: token(prefix),
+  createdBy,
+  expiresAt: new Date(Date.now() + days * 86400000).toISOString().slice(0, 19),
+  createdAt: nowIso(),
+  revoked: false,
+  acceptedCount: 0,
+});
+const issued = (l: MockLink) => ok({ id: l.id, token: l.token, expiresAt: l.expiresAt, createdAt: l.createdAt }, 201);
+/** 링크 token 확인: 다른 용도(400)·없음(404)·폐기·만료(410) */
+function linkByToken(links: MockLink[], value: string, prefix: string, codes: { notFound: string; revoked: string; expired: string }) {
+  if (!value.startsWith(prefix)) throw new MockError(400, "TOKEN_AUDIENCE_MISMATCH", "다른 용도의 링크예요.");
+  const link = links.find((l) => l.token === value);
+  if (!link) throw new MockError(404, codes.notFound, "없는 링크예요.");
+  if (link.revoked) throw new MockError(410, codes.revoked, "취소된 링크예요.");
+  if (link.expiresAt < nowIso()) throw new MockError(410, codes.expired, "만료된 링크예요.");
+  return link;
+}
+const FRIEND_LINK_CODES = { notFound: "FRIEND_LINK_NOT_FOUND", revoked: "FRIEND_LINK_REVOKED", expired: "FRIEND_LINK_EXPIRED" };
+
+on("POST", "/friend-links", ({ db: d, me, body }) => {
+  const link = newLink(d, "fl_", me!.id, me!.id, daysOf(body));
+  d.friendLinks.push(link);
+  return issued(link);
+});
+
+on("GET", "/friend-links", ({ db: d, me }) =>
+  ok(
+    d.friendLinks
+      .filter((l) => l.ownerId === me!.id)
+      .sort((a, b) => b.id - a.id)
+      .map((l) => ({ id: l.id, expiresAt: l.expiresAt, revoked: l.revoked, acceptedCount: l.acceptedCount, createdAt: l.createdAt })),
+  ),
+);
+
+on("DELETE", "/friend-links/:id", ({ db: d, me }, [id]) => {
+  const link = d.friendLinks.find((l) => l.id === Number(id) && l.ownerId === me!.id);
+  if (!link) return fail(404, "FRIEND_LINK_NOT_FOUND", "없는 친구 초대 링크예요.");
+  link.revoked = true;
+  return ok(null, 204);
+});
 
 // 목업 친구 링크는 누가 보냈는지 저장하지 않으므로, 첫 목업 친구가 보낸 링크로 봅니다 (끊었던 친구면 다시 친구가 됩니다).
 const linkOwner = () => FRIENDS[0];
-on("GET", "/friend-links/by-token/:token", (_ctx, [t]) => {
+on("GET", "/friend-links/by-token/:token", ({ db: d }, [t]) => {
   if (!t.startsWith("fl_")) return fail(400, "TOKEN_AUDIENCE_MISMATCH", "친구 초대 링크가 아니에요.");
+  // 이 목업에서 발급한 링크면 폐기·만료를 확인합니다 (예전 목업 링크는 그대로 열림)
+  if (d.friendLinks.some((l) => l.token === t)) linkByToken(d.friendLinks, t, "fl_", FRIEND_LINK_CODES);
   return ok({ valid: true, inviterNickname: linkOwner().nickname });
 }, { auth: false });
 
 on("POST", "/friend-links/by-token/:token/accept", ({ db: d, me }, [t]) => {
   if (!t.startsWith("fl_")) return fail(400, "TOKEN_AUDIENCE_MISMATCH", "친구 초대 링크가 아니에요.");
+  const stored = d.friendLinks.some((l) => l.token === t) ? linkByToken(d.friendLinks, t, "fl_", FRIEND_LINK_CODES) : null;
   const owner = linkOwner();
   const removed = d.removedFriends[me!.id] ?? [];
   const already = !removed.includes(owner.userId);
+  if (stored && !already) stored.acceptedCount += 1;
   d.removedFriends[me!.id] = removed.filter((id) => id !== owner.userId);
   return ok(owner, already ? 200 : 201);
 });
@@ -1180,8 +1288,35 @@ on("POST", "/diaries/:id/share-links", ({ db: d, me }, [id]) => {
   const diary = findMyDiary(d, me!, id);
   const missing = [...(diary.status === "PUBLISHED" ? [] : ["PUBLISHED"]), ...(diary.visibility === "LINK" ? [] : ["VISIBILITY_LINK"])];
   if (missing.length > 0) return fail(422, "DIARY_NOT_PUBLISHABLE", "발행하고 링크 공개로 바꿔 주세요.", { details: { missing } });
-  return ok({ id: ++d.seq, token: token("dl_"), expiresAt: new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 19), createdAt: nowIso() }, 201);
+  const link = newLink(d, "dl_", diary.diaryId, me!.id, 7);
+  d.diaryLinks.push(link);
+  return issued(link);
 });
+
+on("GET", "/diaries/:id/share-links", ({ db: d, me }, [id]) => {
+  const diary = findMyDiary(d, me!, id);
+  return ok(
+    d.diaryLinks
+      .filter((l) => l.ownerId === diary.diaryId)
+      .sort((a, b) => b.id - a.id)
+      .map((l) => ({ id: l.id, expiresAt: l.expiresAt, revoked: l.revoked, createdAt: l.createdAt })),
+  );
+});
+
+on("DELETE", "/diaries/:id/share-links/:linkId", ({ db: d, me }, [id, linkId]) => {
+  const diary = findMyDiary(d, me!, id);
+  const link = d.diaryLinks.find((l) => l.id === Number(linkId) && l.ownerId === diary.diaryId);
+  if (!link) return fail(404, "DIARY_SHARE_LINK_NOT_FOUND", "없는 공유 링크예요.");
+  link.revoked = true;
+  return ok(null, 204);
+});
+
+on("GET", "/shared/diaries/:token", ({ db: d }, [value]) => {
+  const link = linkByToken(d.diaryLinks, value, "dl_", { notFound: "DIARY_SHARE_LINK_NOT_FOUND", revoked: "DIARY_SHARE_LINK_REVOKED", expired: "DIARY_SHARE_LINK_EXPIRED" });
+  const diary = d.diaries.find((x) => x.diaryId === link.ownerId);
+  if (!diary || diary.status !== "PUBLISHED" || diary.visibility !== "LINK") return fail(404, "DIARY_SHARE_LINK_NOT_FOUND", "없는 공유 링크예요.");
+  return ok(diaryView(diary, false));
+}, { auth: false });
 
 on("GET", "/me/travel-map", ({ db: d, me }) =>
   ok(

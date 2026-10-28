@@ -243,6 +243,10 @@ export type Presence = {
 // ── 초대·친구 ──
 export type IssuedLink = { id: number; token: string; expiresAt: string; createdAt: string };
 export type LinkSummary = { id: number; expiresAt: string; revoked: boolean; createdBy: UserRef; createdAt: string };
+/** 2-5 내 친구 초대 링크 — acceptedCount는 이 링크로 새로 친구가 된 수 */
+export type FriendLinkSummary = { id: number; expiresAt: string; revoked: boolean; acceptedCount: number; createdAt: string };
+/** 6-9 여행기 공유 링크 목록 (token 원문 없음) */
+export type DiaryLinkSummary = { id: number; expiresAt: string; revoked: boolean; createdAt: string };
 export type InvitePreview = {
   valid: boolean;
   title: string;

@@ -1,3 +1,4 @@
+import type { BottomSheetModal } from "@gorhom/bottom-sheet";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useFocusEffect } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -10,6 +11,7 @@ import { errorMessage, isApiError } from "@/api/errors";
 import { queryKeys } from "@/api/queryKeys";
 import { Icons } from "@/components/icons";
 import { AppText, BottomCTA, Button, EmptyView, ErrorView, LoadingView, PressableScale, Screen, TopBar } from "@/components/ui";
+import { CourseShareSheet } from "@/features/share/CourseShareSheet";
 import { diffDays } from "@/lib/date";
 import { haptics } from "@/lib/haptics";
 import { shortRegionName, withEuro } from "@/lib/josa";
@@ -150,6 +152,7 @@ export function CourseScreen({ tripId }: { tripId: number }) {
 
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)"));
   const openParticipants = () => router.push({ pathname: "/trip/[tripId]/participants", params: { tripId: String(tripId) } });
+  const shareRef = useRef<BottomSheetModal>(null);
 
   // ── 상태별 화면 ──
   /** 하단 버튼으로 탭을 바꾸면 변경 요약이 보이도록 맨 위로 올립니다 (E1 → E2) */
@@ -217,7 +220,15 @@ export function CourseScreen({ tripId }: { tripId: number }) {
 
   return (
     <Screen>
-      <TopBar title="함께 만드는 코스" onBack={goBack} />
+      <TopBar
+        title="함께 만드는 코스"
+        onBack={goBack}
+        right={
+          <PressableScale onPress={() => shareRef.current?.present()} hitSlop={10} accessibilityRole="button" accessibilityLabel="코스 공유하기" accessibilityHint="로그인 없이 볼 수 있는 읽기 전용 링크를 보내요">
+            <Icons.Share width={20} height={20} />
+          </PressableScale>
+        }
+      />
       <Animated.ScrollView
         ref={scrollRef}
         onScroll={onScroll}
@@ -305,6 +316,7 @@ export function CourseScreen({ tripId }: { tripId: number }) {
         onCancel={() => setConfirmRegenerate(false)}
         onConfirm={() => runGenerate(true)}
       />
+      <CourseShareSheet sheetRef={shareRef} tripId={tripId} title={title} />
     </Screen>
   );
 }

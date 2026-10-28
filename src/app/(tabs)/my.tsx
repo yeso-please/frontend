@@ -5,7 +5,7 @@ import { Alert, RefreshControl, ScrollView, Share, StyleSheet, View } from "reac
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { toast } from "sonner-native";
 
-import { LINK_BASE_URL, USE_MOCK } from "@/api/config";
+import { shareUrl, USE_MOCK } from "@/api/config";
 import { authApi, friendApi } from "@/api/endpoints";
 import { errorMessage } from "@/api/errors";
 import { resetMockDb } from "@/api/mock/server";
@@ -38,7 +38,7 @@ export default function MyScreen() {
     try {
       const link = await friendApi.issueLink();
       await Share.share({ message: `${user?.nickname ?? "친구"}님이 TriPin 친구 초대를 보냈어요. 친구가 되면 여행에 바로 초대할 수 있어요.
-${LINK_BASE_URL}friend/${link.token}` });
+${shareUrl(`friend/${link.token}`)}` });
     } catch (e) {
       toast(errorMessage(e));
     } finally {
@@ -163,6 +163,7 @@ ${LINK_BASE_URL}friend/${link.token}` });
           <MenuRow label="나의 여행 지도" hint="다녀온 여행의 여행기를 지도에서 다시 봐요" href="/my/travel-map" />
           <MenuRow label="친구 관리" hint="친구 목록에서 친구를 찾거나 끊어요" href="/my/friends" />
           <MenuRow label="친구 초대 링크 보내기" hint="링크를 받은 친구가 수락하면 바로 친구가 돼요" onPress={() => void shareFriendLink()} disabled={sharingLink} />
+          <MenuRow label="보낸 친구 초대 링크" hint="보낸 링크를 보고 더 쓰지 않을 링크를 취소해요" href="/my/friend-links" />
           <MenuRow label="로그아웃" onPress={confirmLogout} disabled={busy} />
           {USE_MOCK ? <MenuRow label="목업 데이터 초기화" hint="EXPO_PUBLIC_API_MOCK=true 일 때만 보여요" onPress={confirmReset} disabled={busy} danger /> : null}
         </Animated.View>

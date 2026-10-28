@@ -4,14 +4,15 @@ import { useState } from "react";
 import { ScrollView, Share, StyleSheet, View } from "react-native";
 import { toast } from "sonner-native";
 
-import { LINK_BASE_URL } from "@/api/config";
+import { shareUrl } from "@/api/config";
 import { api } from "@/api/client";
 import { diaryApi } from "@/api/endpoints";
 import { errorMessage, isApiError } from "@/api/errors";
 import { queryKeys } from "@/api/queryKeys";
 import type { Diary } from "@/api/types";
-import { BottomCTA, Button, EmptyView, ErrorView, LoadingView, Screen, TopBar } from "@/components/ui";
+import { AppText, BottomCTA, Button, EmptyView, ErrorView, LoadingView, Screen, TopBar } from "@/components/ui";
 import { ConfirmDialog } from "@/features/course/components/ConfirmDialog";
+import { SentLinkList } from "@/features/share/SentLinkList";
 import { haptics } from "@/lib/haptics";
 import { screenPadding, space } from "@/theme";
 
@@ -41,12 +42,29 @@ export function DiaryScreen({ diaryId }: { diaryId: number }) {
     },
   });
 
+  // includeInTasteProfile은 작성자에게만 옵니다 (6-6). 링크 공유는 발행했고 공개 범위가 LINK일 때만 됩니다.
+  const isAuthor = diary.data?.includeInTasteProfile !== undefined;
+  const canShare = isAuthor && diary.data?.status === "PUBLISHED" && diary.data?.visibility === "LINK";
+  const linksKey = queryKeys.diaryShareLinks(diaryId);
+  const links = useQuery({ queryKey: linksKey, queryFn: () => diaryApi.shareLinks(diaryId), enabled: canShare });
+
   const share = useMutation({
     mutationFn: () => diaryApi.issueShareLink(diaryId),
     onSuccess: async (link) => {
-      await Share.share({ message: `${diary.data?.title ?? "여행기"}\n${LINK_BASE_URL}diary-link/${link.token}` });
+      await Share.share({ message: `${diary.data?.title ?? "여행기"}\n${shareUrl(`diary-link/${link.token}`)}` });
     },
     onError: (e) => toast(isApiError(e, "DIARY_NOT_PUBLISHABLE") ? "발행하고 공개 범위를 '링크'로 바꾸면 공유할 수 있어요" : errorMessage(e)),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: linksKey }),
+  });
+
+  const revoke = useMutation({
+    mutationFn: (linkId: number) => diaryApi.revokeShareLink(diaryId, linkId),
+    onSuccess: () => {
+      haptics.confirm();
+      toast("공유 링크를 취소했어요");
+    },
+    onError: (e) => toast(errorMessage(e)),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: linksKey }),
   });
 
   if (diary.isPending) {
@@ -71,9 +89,6 @@ export function DiaryScreen({ diaryId }: { diaryId: number }) {
   }
 
   const d = diary.data;
-  // includeInTasteProfile은 작성자에게만 옵니다 (6-6).
-  const isAuthor = d.includeInTasteProfile !== undefined;
-  const canShare = isAuthor && d.status === "PUBLISHED" && d.visibility === "LINK";
 
   return (
     <Screen>
@@ -83,6 +98,17 @@ export function DiaryScreen({ diaryId }: { diaryId: number }) {
         {isAuthor ? (
           <View style={styles.authorActions}>
             {canShare ? <Button label="공유 링크 보내기" variant="secondary" height={48} loading={share.isPending} onPress={() => share.mutate()} /> : null}
+            {canShare && links.data && links.data.length > 0 ? (
+              <View style={styles.links}>
+                <AppText variant="bold14">보낸 공유 링크</AppText>
+                <SentLinkList
+                  links={links.data}
+                  revokeMessage="이 링크로는 더 이상 여행기를 볼 수 없어요. 이미 열어 둔 화면도 바로 막혀요."
+                  onRevoke={(l) => revoke.mutate(l.id)}
+                  revokingId={revoke.isPending ? (revoke.variables ?? null) : null}
+                />
+              </View>
+            ) : null}
             <Button label="여행기 지우기" variant="ghost" labelColor="danger" height={44} onPress={() => setConfirmDelete(true)} />
           </View>
         ) : null}
@@ -142,4 +168,5 @@ export function SharedDiaryScreen({ token }: { token: string }) {
 const styles = StyleSheet.create({
   content: { paddingBottom: space[32] },
   authorActions: { paddingHorizontal: screenPadding, paddingTop: space[24], gap: space[8] },
+  links: { gap: space[8], marginTop: space[8] },
 });

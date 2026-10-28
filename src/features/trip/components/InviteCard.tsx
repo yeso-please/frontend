@@ -18,10 +18,12 @@ type Props = {
 
 /**
  * 화면에는 링크를 줄여 보여 줍니다 (tripin://invite/iv_3Qk9…f8Zq). 복사·공유는 원문 그대로입니다.
+ * https 링크는 도메인을 빼고 경로만 줄입니다 (dn77….cloudfront.net/invite/iv_3Qk9… → /invite/iv_3Qk9…f8Zq).
  * 안드로이드의 가운데 말줄임(ellipsizeMode="middle")은 공백 없는 긴 토큰을 말줄임표 없이 잘라 버려서 직접 줄입니다.
  */
 export function shortLink(link: string, head = 26, tail = 4) {
-  return link.length <= head + tail + 1 ? link : `${link.slice(0, head)}…${link.slice(-tail)}`;
+  const shown = /^https?:\/\//.test(link) ? link.replace(/^https?:\/\/[^/]+/, "") : link;
+  return shown.length <= head + tail + 1 ? shown : `${shown.slice(0, head)}…${shown.slice(-tail)}`;
 }
 
 /** 피그마 TriPin/Invitation/Invite Card — 링크 복사(outline) / 초대 링크 공유(mint) */

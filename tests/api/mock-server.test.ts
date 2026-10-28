@@ -670,3 +670,52 @@ describe("여행기·여행 지도 (6장)", () => {
     expect((await call("GET", "/friends/999/travel-map", undefined, token)).json.code).toBe("FRIEND_REQUIRED");
   });
 });
+
+describe("보낸 링크 목록·취소 (2-5·2-6, 4-2·4-3, 4-9~4-13, 6-9·6-10)", () => {
+  it("코스 공유 링크: 로그인 없이 읽기 전용 코스(참여자 이름 감춤) → 취소하면 410", async () => {
+    const { token } = await onboarded("공유자");
+    const { trip } = await tripWithCourse(token);
+    const issued = await call<{ id: number; token: string }>("POST", `/courses/${trip.id}/share-links`, { expiresInDays: 7 }, token);
+    expect(issued.status).toBe(201);
+    expect(issued.json.token.startsWith("sl_")).toBe(true);
+
+    const shared = await call<Course>("GET", `/shared/courses/${issued.json.token}`);
+    expect(shared.status).toBe(200);
+    expect(shared.json.myRole).toBe("VIEWER");
+    expect(shared.json.tasteBasis).toBeNull();
+    expect(shared.json.days.length).toBeGreaterThan(0);
+
+    const list = await call<{ id: number; revoked: boolean; createdBy: { nickname: string } }[]>("GET", `/courses/${trip.id}/share-links`, undefined, token);
+    expect(list.json).toHaveLength(1);
+    expect(list.json[0].createdBy.nickname).toBe("공유자");
+
+    expect((await call("DELETE", `/courses/${trip.id}/share-links/${issued.json.id}`, undefined, token)).status).toBe(204);
+    expect((await call("GET", `/shared/courses/${issued.json.token}`)).json.code).toBe("SHARE_LINK_REVOKED");
+    expect((await call("GET", "/shared/courses/iv_wrongkind")).json.code).toBe("TOKEN_AUDIENCE_MISMATCH");
+    expect((await call("DELETE", `/courses/${trip.id}/share-links/99999`, undefined, token)).json.code).toBe("SHARE_LINK_NOT_FOUND");
+  });
+
+  it("친구 초대 링크: 목록에 수락 수가 보이고, 취소하면 미리보기가 410", async () => {
+    const owner = await onboarded("보낸사람");
+    const link = await call<{ id: number; token: string }>("POST", "/friend-links", { expiresInDays: 7 }, owner.token);
+    const other = await onboarded("받은사람");
+    expect((await call("POST", `/friend-links/by-token/${link.json.token}/accept`, undefined, other.token)).status).toBeLessThan(300);
+
+    const list = await call<{ id: number; acceptedCount: number; revoked: boolean }[]>("GET", "/friend-links", undefined, owner.token);
+    expect(list.json[0]).toMatchObject({ id: link.json.id, revoked: false });
+
+    expect((await call("DELETE", `/friend-links/${link.json.id}`, undefined, owner.token)).status).toBe(204);
+    expect((await call("GET", `/friend-links/by-token/${link.json.token}`)).json.code).toBe("FRIEND_LINK_REVOKED");
+    expect((await call("DELETE", `/friend-links/${link.json.id}`, undefined, other.token)).json.code).toBe("FRIEND_LINK_NOT_FOUND");
+  });
+
+  it("여행 초대 링크: 취소하면 미리보기가 INVITE_REVOKED", async () => {
+    const { token } = await onboarded();
+    const { trip } = await tripWithCourse(token);
+    const link = await call<{ id: number; token: string }>("POST", `/trips/${trip.id}/invites`, { expiresInDays: 7 }, token);
+    expect((await call("DELETE", `/trips/${trip.id}/invites/${link.json.id}`, undefined, token)).status).toBe(204);
+    const list = await call<{ id: number; revoked: boolean }[]>("GET", `/trips/${trip.id}/invites`, undefined, token);
+    expect(list.json.find((l) => l.id === link.json.id)?.revoked).toBe(true);
+    expect((await call("GET", `/invites/${link.json.token}`)).json.code).toBe("INVITE_REVOKED");
+  });
+});

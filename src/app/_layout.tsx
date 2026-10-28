@@ -60,6 +60,8 @@ export default function RootLayout() {
         <Stack.Screen name="invite" />
         <Stack.Screen name="friend/[token]" />
         <Stack.Screen name="diary-link/[token]" />
+        {/* 코스 공유 링크(tripin://course/{token})도 로그인 없이 읽기 전용으로 열립니다 (4-12·4-13) */}
+        <Stack.Screen name="course/[token]" />
       </Stack>
     </AppProviders>
   );

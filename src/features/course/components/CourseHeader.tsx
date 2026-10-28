@@ -53,35 +53,38 @@ export function CourseHeader({ title, startDate, endDate, travelers, onSettings,
         {formatNights(nights)}
       </AppText>
 
-      <View style={styles.travelers}>
-        <View style={styles.avatars} accessible accessibilityLabel={`함께하는 여행자 ${travelers.join(", ")}`}>
-          {shown.map((name, i) => {
-            const tone = TONES[i % TONES.length];
-            return (
-              <View key={`${name}-${i}`} style={[styles.avatar, { backgroundColor: tone.bg }]}>
-                <AppText variant="label" color={tone.fg}>
-                  {initial(name)}
-                </AppText>
+      {/* 공유받은 코스(4-13)는 참여자 이름이 감춰져 와서 줄을 통째로 숨깁니다 */}
+      {travelers.length > 0 || onSettings ? (
+        <View style={styles.travelers}>
+          <View style={styles.avatars} accessible accessibilityLabel={`함께하는 여행자 ${travelers.join(", ")}`}>
+            {shown.map((name, i) => {
+              const tone = TONES[i % TONES.length];
+              return (
+                <View key={`${name}-${i}`} style={[styles.avatar, { backgroundColor: tone.bg }]}>
+                  <AppText variant="label" color={tone.fg}>
+                    {initial(name)}
+                  </AppText>
+                </View>
+              );
+            })}
+            {travelers.length > shown.length ? (
+              <AppText variant="small12" color="muted">{`+${travelers.length - shown.length}`}</AppText>
+            ) : null}
+          </View>
+          <AppText variant="small12" color="charcoal" numberOfLines={1} style={styles.names}>
+            {travelers.join(" · ")}
+          </AppText>
+          {onSettings ? (
+            <PressableScale onPress={onSettings} style={styles.more} accessibilityRole="button" accessibilityLabel="참여자 관리">
+              <View style={styles.moreDots}>
+                <View style={styles.moreDot} />
+                <View style={styles.moreDot} />
+                <View style={styles.moreDot} />
               </View>
-            );
-          })}
-          {travelers.length > shown.length ? (
-            <AppText variant="small12" color="muted">{`+${travelers.length - shown.length}`}</AppText>
+            </PressableScale>
           ) : null}
         </View>
-        <AppText variant="small12" color="charcoal" numberOfLines={1} style={styles.names}>
-          {travelers.join(" · ")}
-        </AppText>
-        {onSettings ? (
-          <PressableScale onPress={onSettings} style={styles.more} accessibilityRole="button" accessibilityLabel="참여자 관리">
-            <View style={styles.moreDots}>
-              <View style={styles.moreDot} />
-              <View style={styles.moreDot} />
-              <View style={styles.moreDot} />
-            </View>
-          </PressableScale>
-        ) : null}
-      </View>
+      ) : null}
 
       {line ? (
         <Animated.View key={line.text} entering={FadeIn.duration(220)} exiting={FadeOut.duration(160)} style={styles.line}>

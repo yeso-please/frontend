@@ -8,7 +8,7 @@ import Animated, { FadeInDown, LinearTransition } from "react-native-reanimated"
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
-import { LINK_BASE_URL } from "@/api/config";
+import { shareUrl } from "@/api/config";
 import { inviteApi, tripApi } from "@/api/endpoints";
 import { errorMessage, isApiError } from "@/api/errors";
 import { queryKeys } from "@/api/queryKeys";
@@ -17,6 +17,7 @@ import { Icons } from "@/components/icons";
 import { AppText, Button, EmptyView, ErrorView, LoadingView, PressableScale, Screen, TopBar } from "@/components/ui";
 import { FriendPickerSheet } from "@/features/trip/components/FriendPickerSheet";
 import { InlineNotice } from "@/features/trip/components/InlineNotice";
+import { SentLinkList } from "@/features/share/SentLinkList";
 import { InviteCard } from "@/features/trip/components/InviteCard";
 import { Skeleton } from "@/features/trip/components/Skeleton";
 import { TravelerRow, type TravelerRowModel } from "@/features/trip/components/TravelerRow";
@@ -62,6 +63,20 @@ export default function TripInviteScreen() {
     refetchOnMount: false,
     refetchOnWindowFocus: false,
     refetchOnReconnect: false,
+  });
+
+  // 4-2 이 여행에서 보낸 초대 링크 (다른 참여자가 만든 링크도 보이고 취소할 수 있어요)
+  const inviteLinks = useQuery({ queryKey: queryKeys.inviteLinks(tripId), queryFn: () => inviteApi.list(tripId), enabled: valid && inviteLink.isSuccess });
+  const revokeLink = useMutation({
+    mutationFn: (inviteId: number) => inviteApi.revoke(tripId, inviteId),
+    onSuccess: async (_data, inviteId) => {
+      haptics.confirm();
+      toast("초대 링크를 취소했어요");
+      // 화면에 보이던 링크를 취소했으면 새 링크를 받아 둡니다
+      if (inviteId === inviteLink.data?.id) await queryClient.resetQueries({ queryKey: tripFlowKeys.inviteLink(tripId) });
+    },
+    onError: (e) => toast(errorMessage(e)),
+    onSettled: () => queryClient.invalidateQueries({ queryKey: queryKeys.inviteLinks(tripId) }),
   });
 
   // 참여자 + 보낸 친구 초대를 한 번에 받아(5초마다, 화면이 보일 때만) 대기 → 참여 이동을 한 번에 그립니다.
@@ -191,7 +206,7 @@ export default function TripInviteScreen() {
 
   const trip = context.data;
   const tripTitle = regionLabel ? `${regionLabel} 여행` : null;
-  const link = inviteLink.data ? `${LINK_BASE_URL}invite/${inviteLink.data.token}` : null;
+  const link = inviteLink.data ? shareUrl(`invite/${inviteLink.data.token}`) : null;
   const linkStatus = inviteLink.isError ? "error" : link ? "ready" : "loading";
   const alone = travelers.isSuccess && participants.length <= 1 && pendingInvites.length === 0;
   const creatorName = creator ? (creator.userId === me?.id ? (me?.nickname ?? creator.nickname) : creator.nickname) : (me?.nickname ?? "");
@@ -256,6 +271,18 @@ export default function TripInviteScreen() {
           <AppText variant="small12" color="blue">
             초대 링크를 친구에게 보내주세요.
           </AppText>
+          {inviteLinks.data && inviteLinks.data.length > 0 ? (
+            <View style={styles.sentLinks}>
+              <AppText variant="bold14">보낸 초대 링크</AppText>
+              <SentLinkList
+                links={inviteLinks.data}
+                detail={(l) => (l.createdBy.userId === me?.id ? null : `${l.createdBy.nickname}님이 만든 링크`)}
+                revokeMessage="이 링크로는 더 이상 참여할 수 없어요. 이미 참여한 친구는 그대로예요."
+                onRevoke={(l) => revokeLink.mutate(l.id)}
+                revokingId={revokeLink.isPending ? (revokeLink.variables ?? null) : null}
+              />
+            </View>
+          ) : null}
         </Animated.View>
 
         <Animated.View entering={enter(3)} layout={LinearTransition.springify()} style={styles.travelers}>
@@ -334,6 +361,7 @@ const styles = StyleSheet.create({
   intro: { gap: space[8], marginBottom: space[8] },
   sharedBanner: { borderRadius: radius.lg, backgroundColor: colors.paleblue, padding: space[16], gap: space[4] },
   linkBlock: { gap: space[12] },
+  sentLinks: { gap: space[8], marginTop: space[8] },
   travelers: { gap: space[4], marginTop: space[8] },
   travelersHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", minHeight: sizes.touchTarget },
   fromFriends: { height: sizes.touchTarget, justifyContent: "center", paddingLeft: space[12] },
