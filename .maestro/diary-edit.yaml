@@ -1,0 +1,44 @@
+appId: com.yesoplease.tripin
+name: 여행기 수정(쓰기 → 설정 → 완료) → 보기 화면에 반영 → 되돌리기
+tags: [needs-device-data]
+env:
+  DIARY_ID: "3"
+  ORIGINAL_BODY: "Phone test"
+---
+# 준비: 발행한 내 여행기 ID와 지금 본문을 넘깁니다 (maestro test -e DIARY_ID=3 -e ORIGINAL_BODY="..." ...).
+# ORIGINAL_BODY는 짧은 글이어야 합니다 (common/replace-body.yaml).
+- runFlow: common/launch.yaml
+- openLink: tripin://diary/${DIARY_ID}/edit
+- extendedWaitUntil:
+    visible: "여행기 제목"
+    timeout: 15000
+# 별점은 맨 위, 본문은 사진·태그 아래에 있습니다
+- tapOn: "5점, .*"
+- runFlow:
+    file: common/replace-body.yaml
+    env:
+      TEXT: "Maestro E2E edit"
+- tapOn: "다음"
+- assertVisible: "공개 범위"
+- assertVisible: "다음 추천에 반영"
+- tapOn: "완료"
+- extendedWaitUntil:
+    visible: "Maestro E2E edit"
+    timeout: 10000
+- assertVisible: "만족도 5점 중 5점"
+# 되돌리기
+- tapOn: "수정하기"
+- extendedWaitUntil:
+    visible: "여행기 제목"
+    timeout: 10000
+- tapOn: "4점, .*"
+- runFlow:
+    file: common/replace-body.yaml
+    env:
+      TEXT: ${ORIGINAL_BODY}
+- tapOn: "다음"
+- tapOn: "완료"
+- extendedWaitUntil:
+    visible: ${ORIGINAL_BODY}
+    timeout: 10000
+- assertVisible: "만족도 5점 중 4점"

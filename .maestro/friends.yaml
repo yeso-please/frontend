@@ -1,0 +1,19 @@
+appId: com.yesoplease.tripin
+name: 친구 목록 → 친구 옵션 → 친구의 여행 지도
+tags: [needs-device-data]
+---
+# 준비: 친구가 한 명 이상 있어야 합니다 (README의 준비 단계).
+- runFlow: common/launch.yaml
+- openLink: tripin://my/friends
+- extendedWaitUntil:
+    visible: "친구 [1-9][0-9]*명"
+    timeout: 15000
+- tapOn:
+    text: ".*님 옵션"
+    index: 0
+- tapOn: "여행 지도 보기"
+- extendedWaitUntil:
+    visible: ".*의 여행 지도"
+    timeout: 10000
+- back
+- assertVisible: "친구 [1-9][0-9]*명"

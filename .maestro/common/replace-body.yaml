@@ -1,0 +1,11 @@
+appId: com.yesoplease.tripin
+---
+# 여행기 본문을 TEXT로 바꿉니다. 본문 칸은 사진·태그 아래라 먼저 내려갑니다.
+# 칸 가운데를 누르므로 본문이 칸 너비의 절반보다 짧아야 커서가 끝에 놓여 한 번에 다 지워집니다.
+- scrollUntilVisible:
+    element: "여행기 본문"
+    direction: DOWN
+- tapOn: "여행기 본문"
+- eraseText: 300
+- inputText: ${TEXT}
+- hideKeyboard

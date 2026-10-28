@@ -41,3 +41,6 @@ example
 # generated native folders
 /ios
 /android
+
+# Reassure 성능 측정 결과
+.reassure/

@@ -1,0 +1,25 @@
+appId: com.yesoplease.tripin
+name: 성능 측정 — 홈 → 내 코스 → 여행(지도) → MY 스크롤
+tags: [perf]
+---
+# Flashlight가 반복마다 앱을 껐다 켭니다:
+#   flashlight test --bundleId com.yesoplease.tripin --testCommand "maestro test .maestro/perf/browse-tabs.yaml" --iterationCount 5
+# 릴리스 빌드에서 재야 의미가 있습니다 (개발 빌드는 JS가 느림).
+- launchApp
+- extendedWaitUntil:
+    visible: '.*이번엔 어디로 떠나볼까요\?'
+    timeout: 30000
+- tapOn: "내 코스"
+- extendedWaitUntil:
+    visible: "MY TRIP"
+    timeout: 10000
+- swipe:
+    direction: UP
+- tapOn: "여행"
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn: "MY"
+- swipe:
+    direction: UP
+- swipe:
+    direction: DOWN

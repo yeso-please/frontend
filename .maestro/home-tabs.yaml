@@ -1,0 +1,25 @@
+appId: com.yesoplease.tripin
+name: 홈 → 여행 → 내 코스 → MY → 나의 여행 지도
+tags: [smoke]
+---
+# 로그인된 상태에서 시작합니다 (비밀번호를 흐름에 넣지 않습니다).
+- runFlow: common/launch.yaml
+- assertVisible: "나의 여행 성향"
+- tapOn: "여행"
+# 하단 탭 4칸: 홈 · 여행 · 내 코스 · MY
+- tapOn: "내 코스"
+- assertVisible: "MY TRIP"
+- assertVisible: "전체 [0-9]+개"
+- tapOn: "다녀옴 [0-9]+개"
+- assertVisible: "다녀옴 [0-9]+개"
+- tapOn: "MY"
+- scrollUntilVisible:
+    element: "나의 여행 지도"
+    direction: DOWN
+- tapOn: "나의 여행 지도"
+# 여행기가 없으면 안내 문구, 있으면 "다녀온 여행 N곳"
+- assertVisible: "여행기를 쓰면 다녀온 곳이 지도에 핀으로 남아요.|다녀온 여행 [0-9]+곳"
+- assertVisible: "기록한 여행"
+- back
+# "홈" 탭은 시스템 내비게이션 바의 "홈" 버튼과 라벨이 같아 누르지 않습니다.
+- assertVisible: "함께 떠나는 친구"

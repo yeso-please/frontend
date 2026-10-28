@@ -1,0 +1,26 @@
+appId: com.yesoplease.tripin
+name: 나의 여행 지도 → 핀 → 여행기 보기
+tags: [needs-device-data]
+---
+# 준비: 발행한 여행기가 하나 이상 있어야 합니다 (README의 준비 단계).
+- runFlow: common/launch.yaml
+- openLink: tripin://my/travel-map
+- extendedWaitUntil:
+    visible: "기록한 여행"
+    timeout: 15000
+- assertVisible:
+    text: "나의 여행 지도, 기록 [1-9][0-9]*곳"
+# 지도 위 핀 (접근성 라벨: "제목, 지역, 날짜")
+- tapOn:
+    text: '.*, .*[구시군], \d{4}-\d{2}-\d{2}'
+    index: 0
+- extendedWaitUntil:
+    visible: "여행기"
+    timeout: 10000
+- assertVisible: "#.*"
+- scrollUntilVisible:
+    element: "여행기 지우기"
+    direction: DOWN
+- assertVisible: "수정하기"
+- back
+- assertVisible: "기록한 여행"

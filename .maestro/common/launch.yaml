@@ -1,0 +1,7 @@
+appId: com.yesoplease.tripin
+---
+# 앱을 켜고 홈이 그려질 때까지 기다립니다. 켜지는 중에 딥 링크를 보내면 홈에 머무르므로 각 흐름이 먼저 부릅니다.
+- launchApp
+- extendedWaitUntil:
+    visible: '.*이번엔 어디로 떠나볼까요\?'
+    timeout: 30000

@@ -1,0 +1,11 @@
+# Maestro E2E (https://github.com/mobile-dev-inc/Maestro) — 실제 폰·에뮬레이터에서 앱을 눌러 보며 확인합니다.
+# 실행: npm run test:e2e   (자세한 준비는 README.md)
+flows:
+  - "*.yaml"
+executionOrder:
+  continueOnFailure: true
+  flowsOrder:
+    - home-tabs
+    - travel-map
+    - friends
+    - diary-edit
