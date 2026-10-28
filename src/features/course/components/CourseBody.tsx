@@ -34,6 +34,8 @@ type Props = {
     onRestore: (removalId: number) => void;
     restoringId?: number | null;
     onOpenMap: (dayIndex: number) => void;
+    /** 그 날 코스에 새 장소 넣기 (지도 관광지 핀 7-3 → 5-3 ADD) */
+    onAddPlace?: (dayIndex: number) => void;
   };
   /** 목록 아래 덧붙일 내용 (예: 코스 다시 만들기) */
   footer?: ReactNode;
@@ -120,6 +122,21 @@ export function CourseBody({ course, transport, tab, onTabChange, dayIndex, onDa
             ))
           )}
 
+          {edit?.onAddPlace && tab === "all" ? (
+            <PressableScale
+              onPress={() => edit.onAddPlace?.(day.dayIndex)}
+              scaleTo={0.98}
+              style={styles.addPlace}
+              accessibilityRole="button"
+              accessibilityLabel={`${day.dayIndex + 1}일차에 장소 추가`}
+              accessibilityHint="지도에서 이 지역 관광지를 둘러보고 코스에 넣어요"
+            >
+              <AppText variant="small13Bold" color="muted">
+                + 이 날에 장소 추가
+              </AppText>
+            </PressableScale>
+          ) : null}
+
           {tab === "changes" && removed.length > 0 ? (
             <Animated.View entering={FadeInDown} style={styles.removed}>
               {removed.map((r) => (
@@ -150,6 +167,16 @@ export function CourseBody({ course, transport, tab, onTabChange, dayIndex, onDa
 }
 
 const styles = StyleSheet.create({
+  addPlace: {
+    height: 44,
+    marginTop: space[8],
+    borderRadius: 11,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: "#CAD3CD",
+    alignItems: "center",
+    justifyContent: "center",
+  },
   wrap: { gap: space[16] },
   hintRow: { flexDirection: "row", alignItems: "center", gap: space[8], marginTop: -space[8] },
   hint: { flex: 1 },

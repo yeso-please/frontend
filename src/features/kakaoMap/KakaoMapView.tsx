@@ -9,7 +9,7 @@ import { AppText, Button } from "@/components/ui";
 import { colors, radius } from "@/theme";
 
 import { buildMapHtml, parseMapMessage, sanitizeAppKey, toRenderScript } from "./html";
-import type { MapMarker, MapPolyline } from "./types";
+import type { MapBounds, MapMarker, MapPolyline } from "./types";
 
 type Status = "loading" | "ready" | "error";
 
@@ -21,6 +21,8 @@ type Props = {
   /** 이 점으로 지도를 옮깁니다 (선택한 후보) */
   focusId?: string | null;
   onMarkerPress?: (id: string) => void;
+  /** 지도를 움직이고 멈출 때마다 보이는 범위 */
+  onBoundsChange?: (bounds: MapBounds) => void;
   /** 지도를 만지는 동안 true — 부모 ScrollView 스크롤을 잠깐 끄는 데 씁니다 */
   onInteractionChange?: (active: boolean) => void;
   style?: StyleProp<ViewStyle>;
@@ -34,7 +36,7 @@ const APP_KEY = sanitizeAppKey(KAKAO_JS_KEY);
  * 등록돼 있어야 지도가 뜹니다. 키가 없거나 SDK를 못 받으면 "지도를 불러오지 못했어요"를 보여 주고,
  * 화면의 목록은 그대로 쓸 수 있습니다.
  */
-export function KakaoMapView({ markers, polylines = [], fitKey = 0, focusId = null, onMarkerPress, onInteractionChange, style, accessibilityLabel }: Props) {
+export function KakaoMapView({ markers, polylines = [], fitKey = 0, focusId = null, onMarkerPress, onBoundsChange, onInteractionChange, style, accessibilityLabel }: Props) {
   const webRef = useRef<WebView>(null);
   const [status, setStatus] = useState<Status>(APP_KEY ? "loading" : "error");
   const [reloadKey, setReloadKey] = useState(0);
@@ -55,6 +57,7 @@ export function KakaoMapView({ markers, polylines = [], fitKey = 0, focusId = nu
     if (msg.type === "ready") setStatus("ready");
     else if (msg.type === "error") setStatus((s) => (s === "ready" && msg.reason === "render" ? s : "error"));
     else if (msg.type === "markerPress") onMarkerPress?.(msg.id);
+    else if (msg.type === "bounds") onBoundsChange?.({ minLat: msg.minLat, minLng: msg.minLng, maxLat: msg.maxLat, maxLng: msg.maxLng, level: msg.level });
   };
 
   // 지도 안의 카카오 로고·링크는 앱 밖 브라우저로 엽니다.

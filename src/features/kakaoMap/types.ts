@@ -2,8 +2,9 @@
  * 지도에 올리는 점.
  * - current: 지금 고른 장소(초록 핀) · candidate: 대체 후보(파란 번호) · course: 코스 방문 순서(초록 번호)
  * - meal: 식당을 고른 식사(민트 번호) · origin: 식당 검색 기준점(작은 점)
+ * - place: 지도 관광지 핀(7-3, 작은 파란 원) · placeOff: 코스에 못 넣는 관광지(흐린 회색 원)
  */
-export type MapMarkerKind = "current" | "candidate" | "course" | "meal" | "origin";
+export type MapMarkerKind = "current" | "candidate" | "course" | "meal" | "origin" | "place" | "placeOff";
 
 export type MapMarker = {
   /** onMarkerPress로 돌려받는 값 */
@@ -39,8 +40,12 @@ export type MapRenderPayload = {
   focusId: string | null;
 };
 
+/** 지도에 보이는 범위 (지도를 움직이고 멈출 때마다) */
+export type MapBounds = { minLat: number; minLng: number; maxLat: number; maxLng: number; level: number };
+
 /** 웹뷰 → RN 메시지 */
 export type MapMessage =
   | { type: "ready" }
   | { type: "markerPress"; id: string }
+  | ({ type: "bounds" } & MapBounds)
   | { type: "error"; reason: "sdk" | "timeout" | "render" | "init" };

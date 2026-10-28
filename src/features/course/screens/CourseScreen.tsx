@@ -283,6 +283,7 @@ export function CourseScreen({ tripId }: { tripId: number }) {
                     onRestore,
                     restoringId,
                     onOpenMap: (d) => router.push({ pathname: "/trip/[tripId]/map", params: { tripId: String(tripId), dayIndex: String(d) } }),
+                    onAddPlace: (d) => router.push({ pathname: "/trip/[tripId]/add", params: { tripId: String(tripId), dayIndex: String(d) } }),
                   }
                 : undefined
             }

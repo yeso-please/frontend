@@ -25,6 +25,12 @@ export function parseMapMessage(raw: string): MapMessage | null {
     const m = JSON.parse(raw) as Partial<MapMessage> & Record<string, unknown>;
     if (m.type === "ready") return { type: "ready" };
     if (m.type === "markerPress" && typeof m.id === "string") return { type: "markerPress", id: m.id };
+    if (m.type === "bounds") {
+      const nums = [m.minLat, m.minLng, m.maxLat, m.maxLng, m.level];
+      if (!nums.every((n) => typeof n === "number" && Number.isFinite(n))) return null;
+      const [minLat, minLng, maxLat, maxLng, level] = nums as number[];
+      return { type: "bounds", minLat, minLng, maxLat, maxLng, level };
+    }
     if (m.type === "error" && (m.reason === "sdk" || m.reason === "timeout" || m.reason === "render" || m.reason === "init")) return { type: "error", reason: m.reason };
     return null;
   } catch {
@@ -48,6 +54,10 @@ font:700 12px/1 -apple-system,Roboto,"Noto Sans KR",sans-serif;box-shadow:0 2px 
 .mk-current{min-width:30px;width:30px;height:30px;padding:0;border-radius:50% 50% 50% 0;transform:rotate(-45deg);
 background:#19B86A;border:2px solid #FFFFFF;}
 .mk-current span{width:10px;height:10px;border-radius:5px;background:#FFFFFF;transform:rotate(45deg);font-size:0;}
+.mk-place{min-width:20px;width:20px;height:20px;padding:0;background:#FFFFFF;border:2px solid #246BEB;}
+.mk-place.sel{background:#246BEB;transform:scale(1.3);}
+.mk-placeOff{min-width:16px;width:16px;height:16px;padding:0;background:#E8EDE9;border:2px solid #FFFFFF;opacity:.85;}
+.mk-placeOff.sel{background:#768078;transform:scale(1.3);}
 `;
 
 const SCRIPT = `
@@ -108,6 +118,11 @@ const SCRIPT = `
       try {
         map = new kakao.maps.Map(document.getElementById('map'), { center: new kakao.maps.LatLng(36.4, 127.9), level: 12 });
         ready = true; clearTimeout(timer); post({ type: 'ready' });
+        // 지도를 움직이고 멈추면 보이는 범위를 알립니다 (관광지 핀을 그 범위만 불러옵니다)
+        kakao.maps.event.addListener(map, 'idle', function(){
+          var b = map.getBounds(), sw = b.getSouthWest(), ne = b.getNorthEast();
+          post({ type: 'bounds', minLat: sw.getLat(), minLng: sw.getLng(), maxLat: ne.getLat(), maxLng: ne.getLng(), level: map.getLevel() });
+        });
         if (pending) { var p = pending; pending = null; render(p); }
       } catch (e) { fail('init'); }
     });
