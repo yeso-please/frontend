@@ -9,8 +9,8 @@ React Native(Expo SDK 57, RN 0.86, New Architecture) Android 앱입니다.
 
 확정 디자인과 초안의 A~F 화면, MY(M1·M2)를 만듭니다.
 
-- **저장 탭:** 이번 범위에서 뺍니다(백엔드 D14). 탭은 홈·여행·MY입니다.
-- **디자인이 없는 화면:** 식당 고르기, 코스 경로 지도, 받은 초대 목록, 내 여행 전체, 친구 초대 링크 수락은 같은 화면 언어로 만들었습니다.
+- **하단 탭:** 홈·여행·내 코스·MY입니다. 내 코스는 피그마 "추가 화면" 01이고, 저장 탭은 이번 범위에서 뺍니다(백엔드 D14).
+- **디자인이 없는 화면:** 식당 고르기, 코스 경로 지도, 받은 초대 목록, 친구 초대 링크 수락은 같은 화면 언어로 만들었습니다.
 - **친구의 여행 성향(초안 M2·M3):** 백엔드가 다른 회원의 MBTI를 주지 않아 닉네임만 보여 줍니다. 백엔드 요청 메모를 남겼습니다.
 
 ## 흐름 (지역 먼저, 백엔드 D1)
@@ -23,7 +23,10 @@ React Native(Expo SDK 57, RN 0.86, New Architecture) Android 앱입니다.
   식사 식당 고르기(SET_RESTAURANT), 코스 지도(5-7 경로), 참여자 관리(E3 내보내기·나가기), "○○가 보고 있어요"(20초 신호)
 홈 탭: 준비 중인 여행 카드(가로 넘김, 준비 단계 칩) / 새 여행, 나의 여행 성향, 벨 = 받은 초대 수
 초대 받기: 벨 → 받은 초대(D2a) / 링크 tripin://invite/{token}(D2b, 로그인 전에도) → 참여 완료(D2c), 둘러보기(E4)
-MY: 프로필·성향·친구(M1), 친구 목록(M2), 내 여행 전체, 친구 초대 링크(tripin://friend/{token})
+내 코스 탭: 다가오는·지난 여행 전체(3-6 period 없이) → 전체/짜는 중(코스 전)/완성(코스 있음)/다녀옴 → 이어서 짜기·코스 보기·여행기 쓰기
+MY: 프로필·성향·친구(M1), 친구 목록(M2), 친구 초대 링크(tripin://friend/{token})
+여행기: 나의 여행 지도(6-7, 발표 자료 화면) → 기록할 여행 "여행기 쓰기"(6-1) → 사진·제목·이야기·만족도·경험 태그·공개 범위(6-2~6-4) → 발행(6-5)
+  친구 여행 지도(6-8, 친구 목록 "···"), 링크 공개 여행기 공유(6-9, tripin://diary-link/{token} → 6-11·6-12, 로그인 없이 열림)
 ```
 
 - **설문:** 백엔드 `aihub-traveler-v2`입니다. 한 페이지에서 순서대로 묻습니다.
@@ -39,6 +42,11 @@ MY: 프로필·성향·친구(M1), 친구 목록(M2), 내 여행 전체, 친구 
 - **코스 생성:**
   - `tasteMode`를 보내지 않습니다. B4·E0의 "내 여행 성향 반영 / 완전 랜덤"은 `/me/preferences`를 바꿉니다.
   - 최초 생성은 여행을 만든 사람만 합니다(`COURSE_CREATOR_ONLY`).
+- **여행기:**
+  - 끝난 여행(오늘보다 종료일이 앞선 여행, 사후 기록 포함)에만 씁니다. 여행기를 만들면 그 여행의 코스는 읽기 전용이 됩니다.
+  - 사진은 expo-image-picker로 고르고 multipart로 올립니다. 다시 압축하지 않아(quality 1) 촬영 위치(EXIF)가 남고, 서버가 위치만 뽑은 뒤 EXIF를 지웁니다. JPEG·PNG·WebP, 장당 10MB, 여행기마다 30장.
+  - 사진 저장소(S3)는 AWS 서버에만 켜져 있습니다. 로컬 백엔드에서는 사진 API가 503입니다.
+  - 백엔드 3-6 `myDiaryId`가 아직 비어 있어, 지도 핀(6-7)의 여행기를 조회해 여행과 맞춥니다(`useDiaryIdsByTrip`).
 - **카카오 로그인:**
   - 백엔드는 웹 리다이렉트 방식(`POST /auth/kakao {code, redirectUri}`)만 지원합니다.
   - 앱은 카카오 인가 페이지를 웹뷰로 열고, 등록된 redirect URI로 이동하는 순간 `code`를 가로채 서버에 보냅니다. `state`로 CSRF를 막습니다.
@@ -55,7 +63,8 @@ src/
     trip/              dates(C7), [tripId]/ index(코스)·invite(D1)·joined(D2c)·participants(E3)·place/[itemId](F1)·meal/[itemId]·map
     invites/           받은 초대 목록·D2a        invite/[token]/  D2b·E4 둘러보기 (로그인 없이 열림)
     friend/[token]     친구 초대 링크 수락 (로그인 없이 열림)
-    my/                persona(C6)·trips·friends(M2)
+    diary/[diaryId]/   여행기 보기(index)·쓰기(edit)        diary-link/[token]  공유 여행기 (로그인 없이 열림)
+    my/                persona(C6)·trips·friends(M2)·travel-map(나의 여행 지도)·friend-map/[userId]
   api/                 client(토큰 재발급 single-flight, timeoutMs), endpoints, types, queryKeys, mock(목업 서버)
   components/ui/       공통 UI (AppText, Button, PressableScale, TopBar, BottomCTA, ProgressBar, Chip, StateViews)
   features/
@@ -64,6 +73,7 @@ src/
     course/            코스 화면·카드·드래그·접속 표시 (useCourse, useCourseEdit, format)
     place/             F1 장소 편집·식사          kakaoMap/   카카오맵 웹뷰 컴포넌트
     invites/           받은 초대·초대 수신 화면    auth/       카카오 로그인
+    diary/             여행기·여행 지도 (TravelMapCanvas, DiaryBody, 편집 화면)
   store/               zustand (auth, tripDraft, pendingInvite)
   theme/               피그마 토큰 (colors, typography, layout, motion)
   lib/                 haptics, date, josa, mapProjection, imageUrl
@@ -99,9 +109,20 @@ assets/illustrations   3D 지형 지도(korea-terrain.webp, 489:1492 3배·배�
 npm run typecheck   # 앱 + 테스트 타입 검사
 npm run lint
 npm test            # Jest (tests/): 설문 값 변환, 준비 단계, 코스 포맷·순서 변경, 지도 투영·배치, 카카오맵 HTML,
-                    # API 클라이언트 토큰 재발급, 목업 API 계약(추첨·코스 편집·초대·친구 링크)
+                    # API 클라이언트 토큰 재발급, 목업 API 계약(추첨·코스 편집·초대·친구 링크·여행기), 내 코스 상태
+                    # tests/components: 화면 컴포넌트(React Native Testing Library) — 버튼·태그·세그먼트, 여행기 본문, 여행 지도 핀
+npm run test:perf:baseline  # Reassure: 렌더 시간·횟수 기준 저장 (tests/perf, 결과는 .reassure/)
+npm run test:perf           # Reassure: 바꾼 코드를 기준과 비교
+npm run test:e2e            # Maestro: 실제 폰에서 흐름 확인 (.maestro/README.md)
 npx expo-doctor
 ```
+
+| 도구 | 쓰는 곳 | 메모 |
+|---|---|---|
+| [React Native Testing Library](https://github.com/callstack/react-native-testing-library) 14 | `tests/components` | `render`·`fireEvent`가 async입니다. 접근성 역할·라벨로 찾습니다. Reanimated·worklets·안전 영역은 `tests/setup.ts`에서 라이브러리 모의 객체로 바꿉니다 |
+| [Reassure](https://github.com/callstack/reassure) | `tests/perf/*.perf-test.tsx` | 핀 30개 여행 지도 약 19ms·렌더 2번, 사진 30장 여행기 약 16ms·렌더 1번 (2026-10-28 기준) |
+| [Maestro](https://github.com/mobile-dev-inc/Maestro) | `.maestro/` | 로그인된 앱에서 시작합니다. Maestro는 adb 서버를 5037에서만 찾습니다 |
+| [Flashlight](https://github.com/bamlab/flashlight) | `.maestro/perf/` | 릴리스 빌드에서 Maestro 흐름을 여러 번 돌려 FPS·CPU·메모리를 잽니다 |
 
 ## 폰트
 
@@ -124,7 +145,7 @@ npm start            # 이후에는 Metro만 띄우면 됩니다
 - **adb 서버 충돌:** LDPlayer 같은 에뮬레이터가 자기 adb(다른 버전)로 5037 포트를 쓰면 무선 연결이 계속 끊깁니다. 이때는 `ANDROID_ADB_SERVER_PORT=5038`처럼 다른 포트에서 adb 서버를 띄웁니다.
 - **카카오맵 웹뷰:**
   - `EXPO_PUBLIC_KAKAO_JS_KEY`와 `EXPO_PUBLIC_KAKAO_MAP_ORIGIN`이 필요합니다.
-  - origin은 카카오 디벨로퍼스 앱 > 플랫폼 > Web 도메인에 등록된 주소여야 합니다. 2026-10-22 기준 `http://localhost:8080`이 등록돼 있고, 5173은 미등록이라 401 `domain mismatched`가 납니다.
+  - origin은 카카오 디벨로퍼스 앱 > 플랫폼 > Web 도메인에 등록된 주소여야 합니다. 2026-10-22 기준 `http://localhost:8080`이 등록돼 있고, 5173은 미등록이라 401 `domain mismatched`가 납니다. AWS CloudFront 주소(`https://dn77qbtivmjzt.cloudfront.net`)도 2026-10-29 기준 미등록(401)이라 AWS용 빌드도 origin은 localhost:8080을 씁니다.
   - 릴리스 빌드 전에는 https 도메인을 등록하고 origin을 바꿔야 합니다. 지도 타일이 http로 오기 때문입니다.
 
 ```bash
