@@ -160,7 +160,7 @@ ${LINK_BASE_URL}friend/${link.token}` });
         </Animated.View>
 
         <Animated.View entering={enter(3)} style={styles.menu}>
-          <MenuRow label="내 여행" hint="다가오는 여행과 지난 여행을 모두 봐요" href="/my/trips" />
+          <MenuRow label="나의 여행 지도" hint="다녀온 여행의 여행기를 지도에서 다시 봐요" href="/my/travel-map" />
           <MenuRow label="친구 관리" hint="친구 목록에서 친구를 찾거나 끊어요" href="/my/friends" />
           <MenuRow label="친구 초대 링크 보내기" hint="링크를 받은 친구가 수락하면 바로 친구가 돼요" onPress={() => void shareFriendLink()} disabled={sharingLink} />
           <MenuRow label="로그아웃" onPress={confirmLogout} disabled={busy} />
