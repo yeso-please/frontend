@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { router, useLocalSearchParams } from "expo-router";
 import { StyleSheet, View } from "react-native";
 import Animated, { FadeInDown, ZoomIn } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { toast } from "sonner-native";
 
 import { friendApi } from "@/api/endpoints";
@@ -26,6 +27,7 @@ const deadLinkText = (e: unknown) => (isApiError(e) ? DEAD_LINK[e.code] : undefi
  */
 export default function FriendLinkScreen() {
   const { token } = useLocalSearchParams<{ token: string }>();
+  const insets = useSafeAreaInsets();
   const queryClient = useQueryClient();
   const signedIn = useAuthStore((s) => s.status === "signedIn");
   const me = useAuthStore((s) => s.user);
@@ -91,7 +93,8 @@ export default function FriendLinkScreen() {
           </AppText>
         </Animated.View>
       </View>
-      <View style={styles.actions}>
+      {/* 시스템 내비게이션 바에 "나중에"가 가려지지 않게 하단 여백을 더합니다 (BottomCTA와 같은 규칙) */}
+      <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 12) + 12 }]}>
         {signedIn ? (
           <>
             <Button label={`${inviter}님과 친구 맺기`} loading={accept.isPending} onPress={() => accept.mutate()} accessibilityHint={me ? `${me.nickname}님의 친구 목록에 추가돼요` : undefined} />
@@ -114,5 +117,5 @@ const styles = StyleSheet.create({
   body: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: screenPadding, gap: space[24] },
   avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.mint, alignItems: "center", justifyContent: "center" },
   texts: { gap: space[12] },
-  actions: { paddingHorizontal: screenPadding, paddingBottom: space[16], gap: space[12] },
+  actions: { paddingHorizontal: screenPadding, gap: space[12] },
 });
