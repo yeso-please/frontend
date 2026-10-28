@@ -24,7 +24,9 @@ React Native(Expo SDK 57, RN 0.86, New Architecture) Android 앱입니다.
 홈 탭: 준비 중인 여행 카드(가로 넘김, 준비 단계 칩) / 새 여행, 나의 여행 성향, 벨 = 받은 초대 수
 초대 받기: 벨 → 받은 초대(D2a) / 링크 tripin://invite/{token}(D2b, 로그인 전에도) → 참여 완료(D2c), 둘러보기(E4)
 내 코스 탭: 다가오는·지난 여행 전체(3-6 period 없이) → 전체/짜는 중(코스 전)/완성(코스 있음)/다녀옴 → 이어서 짜기·코스 보기·여행기 쓰기
-MY: 프로필·성향·친구(M1), 친구 목록(M2), 친구 초대 링크(tripin://friend/{token})
+MY: 프로필·성향·친구(M1), 친구 목록(M2), 친구 초대 링크 보내기·보낸 링크 취소(2-4~2-6)
+공유·초대 링크: 코스 화면 공유 버튼 → 읽기 전용 코스 링크(4-9~4-11) / 여행 초대 화면·여행기·MY에서 보낸 링크 목록과 취소(4-2·4-3, 6-9·6-10, 2-5·2-6)
+  받은 링크: course/{token}(4-12·4-13, 로그인 없이 읽기 전용·참여자 이름 감춤), invite·friend·diary-link/{token}
 여행기: 나의 여행 지도(6-7, 발표 자료 화면) → 기록할 여행 "여행기 쓰기"(6-1) → 사진·제목·이야기·만족도·경험 태그·공개 범위(6-2~6-4) → 발행(6-5)
   친구 여행 지도(6-8, 친구 목록 "···"), 링크 공개 여행기 공유(6-9, tripin://diary-link/{token} → 6-11·6-12, 로그인 없이 열림)
 ```
@@ -123,6 +125,12 @@ npx expo-doctor
 | [Reassure](https://github.com/callstack/reassure) | `tests/perf/*.perf-test.tsx` | 핀 30개 여행 지도 약 19ms·렌더 2번, 사진 30장 여행기 약 16ms·렌더 1번 (2026-10-28 기준) |
 | [Maestro](https://github.com/mobile-dev-inc/Maestro) | `.maestro/` | 로그인된 앱에서 시작합니다. Maestro는 adb 서버를 5037에서만 찾습니다 |
 | [Flashlight](https://github.com/bamlab/flashlight) | `.maestro/perf/` | 릴리스 빌드에서 Maestro 흐름을 여러 번 돌려 FPS·CPU·메모리를 잽니다 |
+
+## 공유 링크 주소
+
+- 서버가 https(AWS)면 `https://<public_url>/{invite|friend|course|diary-link}/{token}`을 보냅니다(`shareUrl`). 카카오톡에서 `tripin://`은 눌리지 않기 때문입니다.
+- 이 주소는 infra 레포 `site/`의 안내 페이지가 받아, 안드로이드에서 앱(`tripin://…`)을 열고 앱이 없으면 앱 받기로 보냅니다. 코스·여행기 공유 링크는 앱 없이도 웹에서 읽기 전용으로 보여 줍니다.
+- 로컬·목업 서버면 `tripin://…`을 그대로 씁니다.
 
 ## APK 배포
 
