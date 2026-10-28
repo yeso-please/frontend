@@ -1,0 +1,120 @@
+name: Release APK
+
+# main에 앱 코드가 들어오면 AWS 서버용 릴리스 APK를 빌드해 <public_url>/download/tripin.apk 로 올립니다.
+# AWS 권한은 OIDC 역할(레포 변수 AWS_APP_RELEASE_ROLE_ARN)로 받습니다. 배포 설정 읽기·download/ 올리기·캐시 비우기만 됩니다
+# (infra 레포 envs/dev/iam.tf "app_release"). 카카오 키는 SSM /tripin/dev/deploy/APP_KAKAO_* 에서 읽습니다.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "assets/**"
+      - "app.json"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/release-apk.yml"
+  workflow_dispatch:
+    inputs:
+      abis:
+        description: "넣을 CPU 종류 (쉼표로 구분, 예: arm64-v8a,armeabi-v7a)"
+        required: true
+        default: "arm64-v8a"
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: release-apk
+  cancel-in-progress: true
+
+env:
+  AWS_REGION: ap-northeast-2
+  ENV: dev
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - run: npm ci
+
+      - name: Test
+        run: npm test -- --ci
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_APP_RELEASE_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # EXPO_PUBLIC_* 는 번들을 만들 때 앱에 들어갑니다 (.env.local 대신 환경변수로 넘김)
+      - name: Read build config
+        run: |
+          get() { aws ssm get-parameter --name "/tripin/$ENV/deploy/$1" --with-decryption --query Parameter.Value --output text; }
+          public_url="$(get PUBLIC_URL)"
+          js_key="$(get APP_KAKAO_JS_KEY)"
+          rest_key="$(get APP_KAKAO_REST_API_KEY)"
+          echo "::add-mask::$js_key"
+          echo "::add-mask::$rest_key"
+          if [ "$js_key" = "CHANGE_ME" ] || [ "$rest_key" = "CHANGE_ME" ]; then
+            echo "::error::카카오 키가 아직 없습니다. infra 레포의 scripts/put-app-keys.ps1 을 먼저 실행하세요."
+            exit 1
+          fi
+          {
+            echo "SITE_BUCKET=$(get SITE_BUCKET)"
+            echo "DISTRIBUTION_ID=$(get DISTRIBUTION_ID)"
+            echo "PUBLIC_URL=$public_url"
+            echo "EXPO_PUBLIC_API_BASE_URL=$public_url/api"
+            echo "EXPO_PUBLIC_API_MOCK=false"
+            echo "EXPO_PUBLIC_KAKAO_REDIRECT_URI=$public_url/auth/kakao/callback"
+            echo "EXPO_PUBLIC_KAKAO_MAP_ORIGIN=$(get APP_KAKAO_MAP_ORIGIN)"
+            echo "EXPO_PUBLIC_KAKAO_JS_KEY=$js_key"
+            echo "EXPO_PUBLIC_KAKAO_REST_API_KEY=$rest_key"
+          } >> "$GITHUB_ENV"
+
+      - name: Prebuild
+        run: npx expo prebuild --platform android --clean --no-install
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      # 지금은 공개 디버그 키로 서명합니다 (팀 테스트용). 릴리스 키를 만들면 여기와 infra android_cert_sha256을 바꿉니다.
+      - name: Build
+        working-directory: android
+        env:
+          NODE_ENV: production
+          ABIS: ${{ inputs.abis || 'arm64-v8a' }}
+        run: ./gradlew assembleRelease -PreactNativeArchitectures="$ABIS" --no-daemon
+
+      # 빌드가 길어 AWS 세션을 새로 받습니다
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_APP_RELEASE_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Upload
+        run: |
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          aws s3 cp "$apk" "s3://$SITE_BUCKET/download/tripin.apk" \
+            --content-type application/vnd.android.package-archive \
+            --content-disposition 'attachment; filename="tripin.apk"' \
+            --cache-control "max-age=300"
+          aws cloudfront create-invalidation --distribution-id "$DISTRIBUTION_ID" --paths "/download/tripin.apk" --query Invalidation.Id --output text
+          echo "APK: $PUBLIC_URL/download/tripin.apk ($(du -h "$apk" | cut -f1), ${GITHUB_SHA::7})" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tripin-apk-${{ github.sha }}
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14

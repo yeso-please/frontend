@@ -124,6 +124,15 @@ npx expo-doctor
 | [Maestro](https://github.com/mobile-dev-inc/Maestro) | `.maestro/` | 로그인된 앱에서 시작합니다. Maestro는 adb 서버를 5037에서만 찾습니다 |
 | [Flashlight](https://github.com/bamlab/flashlight) | `.maestro/perf/` | 릴리스 빌드에서 Maestro 흐름을 여러 번 돌려 FPS·CPU·메모리를 잽니다 |
 
+## APK 배포
+
+main에 앱 코드(`src/`·`assets/`·`app.json`·`package*.json`)가 들어오면 `.github/workflows/release-apk.yml`이 테스트 → 릴리스 APK 빌드(AWS 서버 주소) → `https://dn77qbtivmjzt.cloudfront.net/download/tripin.apk` 업로드를 합니다.
+
+- AWS 권한은 레포 변수 `AWS_APP_RELEASE_ROLE_ARN`의 OIDC 역할로 받습니다. 업로드·캐시 비우기만 됩니다(infra `app_release`).
+- 카카오 키는 SSM `/tripin/dev/deploy/APP_KAKAO_*`에서 읽습니다. 바꾸려면 infra `scripts/put-app-keys.ps1`을 다시 실행하고 Actions에서 "Release APK"를 다시 돌립니다.
+- 기본은 arm64-v8a만 넣습니다. 옛 폰용이 필요하면 Actions에서 직접 실행할 때 `arm64-v8a,armeabi-v7a`를 넣습니다.
+- 지금은 공개 디버그 키로 서명합니다(팀 테스트용).
+
 ## 폰트
 
 Noto Sans KR은 쓰는 굵기 3개(400/500/700)만 씁니다. 한글 완성형·자모·영문·기호만 남긴 서브셋을 `assets/fonts`에 둡니다(OFL, 굵기당 약 2.7MB). `@expo-google-fonts/noto-sans-kr` 패키지 index를 import하면 9개 굵기(약 53MB)가 모두 앱에 들어가므로 쓰지 않습니다.
