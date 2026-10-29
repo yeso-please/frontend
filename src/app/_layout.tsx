@@ -2,9 +2,11 @@ import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { StatusBar } from "expo-status-bar";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
 
 import { refreshSession } from "@/api/client";
+import { StartScreen } from "@/components/StartScreen";
 import { AppProviders } from "@/providers/AppProviders";
 import { useAuthStore } from "@/store/auth";
 import { colors } from "@/theme";
@@ -30,16 +32,26 @@ export default function RootLayout() {
   }, []);
 
   const ready = fontsLoaded && status !== "booting";
+  // 피그마 시작화면: 기본 스플래시는 시작화면 첫 그림이 나오면 내리고, 앱은 준비되는 대로 그 아래에 그려 둡니다.
+  const [startDone, setStartDone] = useState(false);
+  // 시작화면 그림이 늦게 뜨더라도 기본 스플래시가 계속 남지 않게 합니다.
   useEffect(() => {
-    if (ready) SplashScreen.hideAsync();
-  }, [ready]);
+    const timer = setTimeout(() => SplashScreen.hideAsync(), 1500);
+    return () => clearTimeout(timer);
+  }, []);
 
-  if (!ready) return null;
+  return (
+    <View style={{ flex: 1, backgroundColor: colors.white }}>
+      <StatusBar style="dark" />
+      {ready ? <AppStack signedIn={status === "signedIn"} onboardingCompleted={onboardingCompleted} /> : null}
+      {startDone ? null : <StartScreen ready={ready} onShown={() => SplashScreen.hideAsync()} onDone={() => setStartDone(true)} />}
+    </View>
+  );
+}
 
-  const signedIn = status === "signedIn";
+function AppStack({ signedIn, onboardingCompleted }: { signedIn: boolean; onboardingCompleted: boolean }) {
   return (
     <AppProviders>
-      <StatusBar style="dark" />
       <Stack screenOptions={{ headerShown: false, animation: "slide_from_right", contentStyle: { backgroundColor: colors.white } }}>
         <Stack.Protected guard={!signedIn}>
           <Stack.Screen name="(auth)" options={{ animation: "fade" }} />
