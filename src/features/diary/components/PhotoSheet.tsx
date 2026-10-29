@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icons } from "@/components/icons";
 import { AppText, PressableScale } from "@/components/ui";
+import { useSheetBackHandler } from "@/lib/useSheetBackHandler";
 import { colors, radius, screenPadding, shadows, space } from "@/theme";
 
 import { MAX_PHOTOS } from "../constants";
@@ -25,8 +26,9 @@ type Props = {
  */
 export const PhotoSheet = forwardRef<BottomSheetModal, Props>(function PhotoSheet({ remaining, onCamera, onAlbum, onClose }, ref) {
   const insets = useSafeAreaInsets();
+  const back = useSheetBackHandler(ref);
   return (
-    <BottomSheetModal ref={ref} enableDynamicSizing backdropComponent={renderBackdrop} handleIndicatorStyle={styles.handle} backgroundStyle={styles.sheet}>
+    <BottomSheetModal ref={ref} onChange={back.onChange} enableDynamicSizing backdropComponent={renderBackdrop} handleIndicatorStyle={styles.handle} backgroundStyle={styles.sheet}>
       <BottomSheetView style={[styles.content, { paddingBottom: insets.bottom + space[24] }]}>
         <View style={styles.head}>
           <View style={styles.flex}>

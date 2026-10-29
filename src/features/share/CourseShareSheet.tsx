@@ -11,6 +11,7 @@ import { errorMessage } from "@/api/errors";
 import { queryKeys } from "@/api/queryKeys";
 import { AppText, Button } from "@/components/ui";
 import { haptics } from "@/lib/haptics";
+import { useSheetBackHandler } from "@/lib/useSheetBackHandler";
 import { useAuthStore } from "@/store/auth";
 import { colors, radius, screenPadding, shadows, space } from "@/theme";
 
@@ -26,8 +27,9 @@ type Props = { sheetRef: RefObject<BottomSheetModal | null>; tripId: number; tit
  */
 export function CourseShareSheet({ sheetRef, tripId, title }: Props) {
   const insets = useSafeAreaInsets();
+  const back = useSheetBackHandler(sheetRef);
   return (
-    <BottomSheetModal ref={sheetRef} snapPoints={["70%"]} backdropComponent={renderBackdrop} handleIndicatorStyle={styles.handle} backgroundStyle={styles.sheet}>
+    <BottomSheetModal ref={sheetRef} onChange={back.onChange} snapPoints={["70%"]} enableDynamicSizing={false} backdropComponent={renderBackdrop} handleIndicatorStyle={styles.handle} backgroundStyle={styles.sheet}>
       <BottomSheetScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space[24] }]}>
         <CourseShareContent tripId={tripId} title={title} />
       </BottomSheetScrollView>

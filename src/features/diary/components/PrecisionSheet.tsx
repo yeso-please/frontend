@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { LocationPrecision } from "@/api/types";
 import { Icons } from "@/components/icons";
 import { AppText, PressableScale } from "@/components/ui";
+import { useSheetBackHandler } from "@/lib/useSheetBackHandler";
 import { colors, radius, screenPadding, shadows, space } from "@/theme";
 
 import { PRECISION_OPTIONS } from "../constants";
@@ -17,8 +18,9 @@ type Props = { value: LocationPrecision; onSelect: (value: LocationPrecision) =>
 /** 추가 화면 04 "사진 위치 공개 ›" — 세 가지 중 하나를 고르는 시트 (안드로이드 Alert는 버튼이 3개까지라 시트로 둡니다) */
 export const PrecisionSheet = forwardRef<BottomSheetModal, Props>(function PrecisionSheet({ value, onSelect }, ref) {
   const insets = useSafeAreaInsets();
+  const back = useSheetBackHandler(ref);
   return (
-    <BottomSheetModal ref={ref} enableDynamicSizing backdropComponent={renderBackdrop} handleIndicatorStyle={styles.handle} backgroundStyle={styles.sheet}>
+    <BottomSheetModal ref={ref} onChange={back.onChange} enableDynamicSizing backdropComponent={renderBackdrop} handleIndicatorStyle={styles.handle} backgroundStyle={styles.sheet}>
       <BottomSheetView style={[styles.content, { paddingBottom: insets.bottom + space[24] }]}>
         <View style={styles.head}>
           <AppText variant="cardTitle">사진 위치 공개</AppText>

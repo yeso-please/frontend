@@ -14,6 +14,7 @@ import { AppText, Button, PressableScale } from "@/components/ui";
 import { CATEGORY_LABEL } from "@/features/course/components/CategoryGlyph";
 import { kakaoMapLink } from "@/features/kakaoMap";
 import { secureImageUrl } from "@/lib/imageUrl";
+import { useSheetBackHandler } from "@/lib/useSheetBackHandler";
 import { colors, radius, screenPadding, shadows, space } from "@/theme";
 
 const renderBackdrop = (props: BottomSheetBackdropProps) => <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} pressBehavior="close" />;
@@ -34,8 +35,9 @@ type Props = { sheetRef: RefObject<BottomSheetModal | null>; attractionId: numbe
  */
 export function AttractionDetailSheet({ sheetRef, attractionId }: Props) {
   const insets = useSafeAreaInsets();
+  const back = useSheetBackHandler(sheetRef);
   return (
-    <BottomSheetModal ref={sheetRef} snapPoints={["80%"]} backdropComponent={renderBackdrop} handleIndicatorStyle={styles.handle} backgroundStyle={styles.sheet}>
+    <BottomSheetModal ref={sheetRef} onChange={back.onChange} snapPoints={["80%"]} enableDynamicSizing={false} backdropComponent={renderBackdrop} handleIndicatorStyle={styles.handle} backgroundStyle={styles.sheet}>
       <BottomSheetScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + space[24] }]}>
         {attractionId != null ? <DetailContent attractionId={attractionId} /> : null}
       </BottomSheetScrollView>
