@@ -210,7 +210,6 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
   const watching = presenceSentence(watchers);
   const headerLine = watching ? { text: watching, live: true } : { text: "친구와 함께 장소를 추가·제외할 수 있어요." };
   const transport = context.data?.transport ?? "CAR";
-  const friendChanges = (data?.changes?.days ?? []).reduce((n, d) => n + d.added + d.replaced + d.removed, 0);
 
   const alone = (participants.data?.length ?? 1) <= 1;
   // 서버에는 확정 단계가 없어(코스는 계속 고침) 준비 흐름의 끝은 홈으로 돌아가는 것으로 맺습니다.
@@ -225,10 +224,12 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
   if (!data) {
     if (!regionSigCd) cta = { label: "랜덤으로 여행지 정하기", onPress: () => pickRegion.mutate(), loading: pickRegion.isPending };
     else if (canGenerate) cta = { label: generate.isPending ? "코스를 만드는 중이에요" : "첫 코스 만들기", onPress: () => runGenerate(), loading: generate.isPending };
-  } else if (friendChanges === 0 && preparing) {
-    // 3/4에서 넘어왔으면 친구 초대로 되돌려 보내지 않습니다 (혼자 가기·초대 후 응답 대기 모두)
+  } else if (preparing) {
+    // 3/4에서 넘어왔으면 친구 초대로 되돌려 보내지 않습니다 (혼자 가기·초대 후 응답 대기 모두).
+    // 변경 수에는 내가 직접 바꾼 것도 들어가므로 변경이 있어도 준비를 끝맺습니다 (변경은 '변경 표시' 탭에서 봄).
     cta = { label: "여행 준비 완료", onPress: finishPrep };
-  } else if (friendChanges === 0 && alone) {
+  } else if (alone) {
+    // 혼자인 여행에는 '친구 변경'을 권하지 않습니다.
     inviteLink = true;
   } else if (tab === "all") {
     cta = { label: "친구 변경 확인하기", onPress: () => switchTab("changes") };
