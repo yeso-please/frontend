@@ -61,20 +61,22 @@ src/
   app/                 expo-router 라우트 (파일 = 화면)
     (auth)/            로그인·회원가입·카카오 웹뷰
     onboarding/, survey.tsx   첫 설문 / 성향검사 다시하기
-    (tabs)/            홈(index)·여행(travel)·MY(my)
+    (tabs)/            홈(index)·여행(travel)·내 코스(courses)·MY(my)
     region/[sigCd]     B4 지역 추천
-    trip/              dates(C7), [tripId]/ index(코스)·invite(D1)·joined(D2c)·participants(E3)·place/[itemId](F1)·meal/[itemId]·map
+    trip/              dates(C7), [tripId]/ index(코스)·invite(D1)·joined(D2c)·participants(E3)·place/[itemId](F1)·add(장소 추가)·meal/[itemId]·map
     invites/           받은 초대 목록·D2a        invite/[token]/  D2b·E4 둘러보기 (로그인 없이 열림)
     friend/[token]     친구 초대 링크 수락 (로그인 없이 열림)
     diary/[diaryId]/   여행기 보기(index)·쓰기(edit)        diary-link/[token]  공유 여행기 (로그인 없이 열림)
-    my/                persona(C6)·trips·friends(M2)·travel-map(나의 여행 지도)·friend-map/[userId]
+    course/[token]     공유 코스 (로그인 없이 열림, 읽기 전용)
+    my/                persona(C6)·friends(M2)·friend-links(보낸 친구 초대 링크)·travel-map(나의 여행 지도)·friend-map/[userId]
   api/                 client(토큰 재발급 single-flight, timeoutMs), endpoints, types, queryKeys, mock(목업 서버)
   components/ui/       공통 UI (AppText, Button, PressableScale, TopBar, BottomCTA, ProgressBar, Chip, StateViews)
   features/
     home/              A1·A2 홈 대시보드          discover/   B1~B4 지도·핀·지역 추천
     onboarding/, mbti/ 설문·성향 결과             trip/       날짜·초대·준비 단계
     course/            코스 화면·카드·드래그·접속 표시 (useCourse, useCourseEdit, format)
-    place/             F1 장소 편집·식사          kakaoMap/   카카오맵 웹뷰 컴포넌트
+    place/             F1 장소 편집·장소 추가·식사·관광지 정보   kakaoMap/   카카오맵 웹뷰 컴포넌트
+    share/             보낸 링크 목록·취소, 코스 공유 시트
     invites/           받은 초대·초대 수신 화면    auth/       카카오 로그인
     diary/             여행기·여행 지도 (TravelMapCanvas, DiaryBody, 편집 화면)
   store/               zustand (auth, tripDraft, pendingInvite)
@@ -164,7 +166,7 @@ npm start            # 이후에는 Metro만 띄우면 됩니다
 - **카카오맵 웹뷰:**
   - `EXPO_PUBLIC_KAKAO_JS_KEY`와 `EXPO_PUBLIC_KAKAO_MAP_ORIGIN`이 필요합니다.
   - origin은 카카오 디벨로퍼스 앱 > 플랫폼 > Web 도메인에 등록된 주소여야 합니다. 2026-10-22 기준 `http://localhost:8080`이 등록돼 있고, 5173은 미등록이라 401 `domain mismatched`가 납니다. AWS CloudFront 주소(`https://dn77qbtivmjzt.cloudfront.net`)도 2026-10-29 기준 미등록(401)이라 AWS용 빌드도 origin은 localhost:8080을 씁니다.
-  - 릴리스 빌드 전에는 https 도메인을 등록하고 origin을 바꿔야 합니다. 지도 타일이 http로 오기 때문입니다.
+  - 이 출처에서는 카카오 SDK가 지도 타일을 http로 받습니다. 릴리스 빌드는 `plugins/withKakaoMapCleartext.js`로 카카오 도메인에만 평문 HTTP를 허용합니다. https 도메인을 등록하고 origin을 바꾸면 이 우회는 빼도 됩니다.
 
 ```bash
 adb reverse tcp:8080 tcp:8080
