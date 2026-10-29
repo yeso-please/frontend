@@ -207,7 +207,9 @@ near = ndi.distance_transform_edt(~land) <= 2.5
 P_alpha = np.where(land | near, P[iy, ix], -1)
 pieces = []
 for i, sc in enumerate(sido_codes):
-    m = P_alpha == i
+    # 이웃 조각과 2px 겹칩니다. 확대·축소로 가장자리가 반투명해져도 경계선 가운데로 아래 그림이 비치지 않게
+    # (겹치는 자리는 양쪽 모두 흰 경계선이라 티가 나지 않음).
+    m = ndi.binary_dilation(P_alpha == i, iterations=2) & (P_alpha >= 0)
     ys, xs = np.nonzero(m)
     x0, y0, x1, y1 = xs.min(), ys.min(), xs.max() + 1, ys.max() + 1
     alpha = (base[..., 3] * m)[y0:y1, x0:x1]
