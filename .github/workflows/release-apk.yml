@@ -84,6 +84,11 @@ jobs:
             echo "EXPO_PUBLIC_KAKAO_REST_API_KEY=$rest_key"
           } >> "$GITHUB_ENV"
 
+      # 업데이트마다 versionCode를 올립니다. 폰의 이미지 캐시(Glide)는 리소스 번호 + versionCode로 그림을 구분해서,
+      # 번호가 그대로면 새 APK를 깔아도 바뀐 그림 대신 예전 그림을 보여 줍니다 (지도 조각 경계선이 안 바뀌던 문제).
+      - name: Set versionCode
+        run: node -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync('app.json','utf8'));a.expo.android.versionCode=1000+Number(process.env.GITHUB_RUN_NUMBER);fs.writeFileSync('app.json',JSON.stringify(a,null,2));console.log('versionCode',a.expo.android.versionCode)"
+
       - name: Prebuild
         run: npx expo prebuild --platform android --clean --no-install
 
