@@ -158,6 +158,7 @@ export function DiscoverScreen() {
     s.cancel();
     if (s.result) {
       choreo.placeAt(s.result);
+      track(regionShape(s.result.sigCd)?.piece ?? -1);
       zoom.set(withSpring(2, motion.spring.gentle));
       sheet.set(withSpring(1, motion.spring.gentle));
       outlineDraw.set(withTiming(1, motion.timing.base));
