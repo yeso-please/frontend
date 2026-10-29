@@ -30,10 +30,15 @@ import { usePresence } from "../usePresence";
 const POLL_MS = 20_000;
 const STATUS_MS = 4_000;
 
-/** 피그마 E0 첫 코스 · E1 함께 만드는 코스 · E2 변경 표시 · E5~E8 순서 바꾸기 */
-export function CourseScreen({ tripId }: { tripId: number }) {
+/**
+ * 피그마 E0 첫 코스 · E1 함께 만드는 코스 · E2 변경 표시 · E5~E8 순서 바꾸기
+ * fromPrep: 여행 준비 3/4(친구 초대)에서 넘어온 4/4 단계. 이때는 "여행 준비 완료"로 준비를 끝맺습니다.
+ */
+export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fromPrep?: boolean }) {
   const queryClient = useQueryClient();
   const me = useAuthStore((s) => s.user);
+  // 이 화면에서 첫 코스를 만들어도 준비 중인 것으로 봅니다 (홈 카드 "이어서 준비하기"로 들어온 경우).
+  const [preparing, setPreparing] = useState(fromPrep);
   const [focused, setFocused] = useState(true);
   useFocusEffect(
     useCallback(() => {
@@ -102,6 +107,7 @@ export function CourseScreen({ tripId }: { tripId: number }) {
         setTab("all");
         setDayIndex(0);
         if (regenerate) toast("새 코스를 만들었어요");
+        else setPreparing(true);
       },
       onError: (e) => {
         setConfirmRegenerate(false);
@@ -206,12 +212,24 @@ export function CourseScreen({ tripId }: { tripId: number }) {
   const transport = context.data?.transport ?? "CAR";
   const friendChanges = (data?.changes?.days ?? []).reduce((n, d) => n + d.added + d.replaced + d.removed, 0);
 
+  const alone = (participants.data?.length ?? 1) <= 1;
+  // 서버에는 확정 단계가 없어(코스는 계속 고침) 준비 흐름의 끝은 홈으로 돌아가는 것으로 맺습니다.
+  const finishPrep = () => {
+    haptics.confirm();
+    toast("여행 준비를 마쳤어요", { description: "코스는 여행 전까지 언제든 고칠 수 있어요." });
+    router.dismissTo("/(tabs)");
+  };
   let cta: { label: string; onPress: () => void; loading?: boolean; disabled?: boolean } | null = null;
+  /** 혼자인 여행을 다시 열었을 때 작은 "친구 초대하기" 링크 (참여자 화면에는 초대 입구가 없습니다) */
+  let inviteLink = false;
   if (!data) {
     if (!regionSigCd) cta = { label: "랜덤으로 여행지 정하기", onPress: () => pickRegion.mutate(), loading: pickRegion.isPending };
     else if (canGenerate) cta = { label: generate.isPending ? "코스를 만드는 중이에요" : "첫 코스 만들기", onPress: () => runGenerate(), loading: generate.isPending };
-  } else if ((participants.data?.length ?? 1) <= 1 && friendChanges === 0) {
-    cta = { label: "친구들과 코스 다듬기", onPress: () => router.push({ pathname: "/trip/[tripId]/invite", params: { tripId: String(tripId) } }) };
+  } else if (friendChanges === 0 && preparing) {
+    // 3/4에서 넘어왔으면 친구 초대로 되돌려 보내지 않습니다 (혼자 가기·초대 후 응답 대기 모두)
+    cta = { label: "여행 준비 완료", onPress: finishPrep };
+  } else if (friendChanges === 0 && alone) {
+    inviteLink = true;
   } else if (tab === "all") {
     cta = { label: "친구 변경 확인하기", onPress: () => switchTab("changes") };
   } else {
@@ -304,6 +322,10 @@ export function CourseScreen({ tripId }: { tripId: number }) {
       {cta ? (
         <BottomCTA>
           <Button label={cta.label} onPress={cta.onPress} loading={cta.loading} disabled={cta.disabled} rightIcon={cta.loading ? undefined : <Icons.ArrowRight width={20} height={20} />} />
+        </BottomCTA>
+      ) : inviteLink ? (
+        <BottomCTA helper="친구 초대하기" onHelperPress={() => router.push({ pathname: "/trip/[tripId]/invite", params: { tripId: String(tripId), from: "course" } })}>
+          {null}
         </BottomCTA>
       ) : null}
 

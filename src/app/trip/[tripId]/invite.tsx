@@ -38,7 +38,7 @@ const enter = (i: number) => FadeInDown.delay(motion.stagger * i).springify().da
 
 /** 피그마 D1 · 친구 초대 / D1a · 초대 전송 완료 (여행 준비 3/4) */
 export default function TripInviteScreen() {
-  const params = useLocalSearchParams<{ tripId: string }>();
+  const params = useLocalSearchParams<{ tripId: string; from?: string }>();
   const tripId = Number(params.tripId);
   const valid = Number.isInteger(tripId) && tripId > 0;
   const isFocused = useIsFocused();
@@ -174,9 +174,12 @@ export default function TripInviteScreen() {
     setShared(true);
   };
 
-  const finish = () => {
+  /** 3/4 → 4/4 코스. 코스 화면은 prep을 보고 "친구 초대"로 되돌려 보내지 않고 "여행 준비 완료"로 끝맺습니다. */
+  const finish = (solo: boolean) => {
     void queryClient.invalidateQueries({ queryKey: ["trips"] });
-    router.replace({ pathname: "/trip/[tripId]", params: { tripId: String(tripId) } });
+    // 코스 화면의 "친구 초대하기"로 들어왔으면 그 코스 화면으로 돌아갑니다 (코스 화면이 두 번 쌓이지 않게).
+    if (params.from === "course" && router.canGoBack()) router.back();
+    else router.replace({ pathname: "/trip/[tripId]", params: { tripId: String(tripId), prep: solo ? "solo" : "friends" } });
   };
 
   if (!valid || (context.isError && isApiError(context.error, "TRIP_NOT_FOUND"))) {
@@ -340,8 +343,8 @@ export default function TripInviteScreen() {
       </ScrollView>
 
       <View style={[styles.actions, { paddingBottom: Math.max(insets.bottom, 12) + 12 }]}>
-        <Button label="친구 초대 완료" onPress={finish} rightIcon={<Icons.ArrowRight width={20} height={20} />} />
-        <Button label="혼자 여행할게요" variant="secondary" height={48} onPress={finish} accessibilityHint="친구 없이 코스 만들기로 넘어가요" />
+        <Button label="친구 초대 완료" onPress={() => finish(false)} rightIcon={<Icons.ArrowRight width={20} height={20} />} />
+        <Button label="혼자 여행할게요" variant="secondary" height={48} onPress={() => finish(true)} accessibilityHint="친구 없이 코스 만들기로 넘어가요" />
       </View>
 
       <FriendPickerSheet
