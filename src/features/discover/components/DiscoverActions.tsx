@@ -1,17 +1,23 @@
 import { StyleSheet, View } from "react-native";
-import Animated, { FadeInDown, FadeOutDown, ZoomIn, ZoomOut } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeOutDown, type SharedValue, ZoomIn, ZoomOut } from "react-native-reanimated";
 import Svg, { Circle, Path } from "react-native-svg";
 
-import { Icons } from "@/components/icons";
 import { Button, PressableScale } from "@/components/ui";
 import { colors, motion, radius, screenPadding, space } from "@/theme";
+
+import { HoldToThrowButton } from "./HoldToThrowButton";
 
 type Props = {
   top: number;
   visible: boolean;
   /** 조건 뽑기(내 취향)를 켰는지 */
   conditional: boolean;
-  onDraw: () => void;
+  /** 핀 꽂기를 꾹 누르고 있는지 · 모은 힘 0~1 */
+  holding: boolean;
+  power: SharedValue<number>;
+  onHoldStart: () => void;
+  onRelease: () => void;
+  onShortPress: () => void;
   onManual: () => void;
   onConditions: () => void;
 };
@@ -29,23 +35,26 @@ function SlidersIcon() {
 
 /**
  * B1 버튼 (피그마 Home actions 24,652: 핀 꽂기 46 + 4 + 직접 지역 선택하기 44).
+ * 핀 꽂기는 꾹 눌렀다가 떼면 핀이 날아갑니다 (지도에 다트를 던지는 랜덤 여행 영상에서 착안).
  * 핀 꽂기 오른쪽의 작은 조건 버튼은 숨김 레이어 Region conditions를 여는 자리입니다.
  * B2·B3에서는 아래로 사라집니다 (피그마 B2는 버튼을 화면 밖 y870에 둡니다).
  */
-export function DiscoverActions({ top, visible, conditional, onDraw, onManual, onConditions }: Props) {
+export function DiscoverActions({ top, visible, conditional, holding, power, onHoldStart, onRelease, onShortPress, onManual, onConditions }: Props) {
   return (
     <View style={[styles.slot, { top }]} pointerEvents="box-none">
       {visible ? (
         <Animated.View entering={FadeInDown.duration(320)} exiting={FadeOutDown.duration(200)} style={styles.layer}>
           <View style={styles.row}>
-            <Button
+            <HoldToThrowButton
               label={conditional ? "내 취향으로 핀 꽂기" : "핀 꽂기"}
-              variant="primary"
-              height={46}
-              leftIcon={<Icons.PinButton width={21} height={21} />}
-              onPress={onDraw}
+              holdingLabel="놓으면 핀이 날아가요"
+              holding={holding}
+              power={power}
+              onHoldStart={onHoldStart}
+              onRelease={onRelease}
+              onShortPress={onShortPress}
               style={styles.flex}
-              accessibilityHint={conditional ? "내 취향과 닮은 지역 위주로 핀을 꽂아요" : "앱이 여행지를 무작위로 골라 지도에 핀을 꽂아요"}
+              accessibilityHint={conditional ? "꾹 눌렀다가 놓으면 내 취향과 닮은 지역으로 핀이 날아가요" : "꾹 눌렀다가 놓으면 핀이 날아가 여행지가 무작위로 정해져요"}
             />
             <PressableScale
               onPress={onConditions}
