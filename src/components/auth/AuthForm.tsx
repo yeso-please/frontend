@@ -12,7 +12,7 @@ export function AuthLayout({ title, subtitle, children, footer }: { title: strin
     <KeyboardAvoidingView style={styles.flex} behavior="height">
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Animated.View entering={FadeInDown.springify().damping(motion.spring.gentle.damping)} style={styles.logo}>
-          <Icons.LogoPin width={29} height={28} />
+          <Icons.LogoPin width={23} height={28} />
           <AppText variant="logo">TriPin</AppText>
         </Animated.View>
         <Animated.View entering={FadeInDown.delay(motion.stagger).springify()}>

@@ -33,7 +33,7 @@ export function EmptyView({ title, description, actionLabel, onAction }: { title
   return (
     <Animated.View entering={FadeIn} style={styles.center}>
       <View style={styles.badge}>
-        <Icons.LogoPin width={29} height={28} />
+        <Icons.LogoPin width={23} height={28} />
       </View>
       <AppText variant="label" align="center">
         {title}

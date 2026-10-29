@@ -14,7 +14,7 @@ export function DiscoverAppBar() {
   return (
     <View style={styles.bar}>
       <View style={styles.logo} accessible accessibilityRole="header" accessibilityLabel="TriPin">
-        <Icons.LogoPin width={29} height={28} />
+        <Icons.LogoPin width={23} height={28} />
         <AppText variant="logo">TriPin</AppText>
       </View>
       <PressableScale
