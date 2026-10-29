@@ -34,8 +34,6 @@ import MotiveHistory from "@/assets/icons/motive-history.svg";
 import MotiveNewExperience from "@/assets/icons/motive-new-experience.svg";
 import MotiveRest from "@/assets/icons/motive-rest.svg";
 import MotiveWellness from "@/assets/icons/motive-wellness.svg";
-import NavCourse from "@/assets/icons/icon-nav-course.svg";
-import NavCourseActive from "@/assets/icons/icon-nav-course-active.svg";
 import NavHome from "@/assets/icons/icon-nav-home.svg";
 import NavHomeActive from "@/assets/icons/icon-nav-home-active.svg";
 import NavSave from "@/assets/icons/icon-nav-save.svg";
@@ -98,8 +96,6 @@ export const Icons = {
   MotiveNewExperience,
   MotiveRest,
   MotiveWellness,
-  NavCourse,
-  NavCourseActive,
   NavHome,
   NavHomeActive,
   NavSave,
