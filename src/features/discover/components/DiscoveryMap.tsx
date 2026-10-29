@@ -24,22 +24,22 @@ import { type DiscoverGeometry, mapTransform, PIN, projectOnScreen } from "../li
 
 const KOREA_TERRAIN = require("@/assets/illustrations/korea-terrain.webp");
 
-// 피그마 B3: Selected area glow 84×46 (핀 끝보다 1 오른쪽·9 아래가 중심)
-const GLOW = { width: 84, height: 46, dx: 1, dy: 9 } as const;
 /** 라벨 상자 폭 (말풍선은 그 안에서 왼쪽 정렬) */
 const LABEL_BOX = 200;
 /** 인트로 뒤 가림막 아래쪽 그라데이션 높이 */
 const VEIL_FADE = 28;
-/** 들린 조각 아래로 보이는 옆면(땅 두께) 색 */
-const PIECE_SIDE = "#2F4B2C";
+/** 들린 조각 아래로 보이는 옆면(땅 두께) 색 — 그림 해안 절벽과 비슷한 흙빛 */
+const PIECE_SIDE = "#6B5B3A";
+const PIECE_SIDE_MAX = 0.62;
 /** 손에 든 핀은 가까이 있어 크게, 날아가며 원래 크기로 */
 const HELD_SCALE = 1.75;
 /** 던진 핀이 그리는 포물선 높이 (모은 힘만큼 더 높이) */
 const ARC = 150;
 const ARC_EXTRA = 70;
-/** 선택 지역 외곽선 두께 (B3 확대 화면 기준 dp): 흰 바탕 선 위에 초록 선 */
-const OUTLINE_UNDER = 4.6;
-const OUTLINE_LINE = 2.4;
+/** 선택 지역 외곽선 두께 (B3 확대 화면 기준 dp): 흰 바탕 선 위에 초록 선. 작은 구도 보이게 굵게 */
+const OUTLINE_UNDER = 6.4;
+const OUTLINE_LINE = 3.4;
+const OUTLINE_FILL = 0.32;
 
 const AnimatedPath = Animated.createAnimatedComponent(Path);
 
@@ -60,7 +60,7 @@ const MapPiece = memo(function MapPiece({ index, scale, wave }: { index: number;
   const piece = MAP_PIECES[index];
   const topStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -pieceLift(wave, index) }] }));
   // 조각이 들리면 비는 자리(제자리 실루엣 중 윗면에 가리지 않은 띠)가 옆면처럼 보입니다.
-  const sideStyle = useAnimatedStyle(() => ({ opacity: Math.min(0.85, Math.max(0, pieceLift(wave, index)) / 2.5) }));
+  const sideStyle = useAnimatedStyle(() => ({ opacity: Math.min(PIECE_SIDE_MAX, Math.max(0, pieceLift(wave, index)) / 3) }));
   const box = { left: piece.x * scale, top: piece.y * scale, width: piece.w * scale, height: piece.h * scale };
   return (
     <View style={[styles.piece, box]}>
@@ -84,7 +84,7 @@ function RegionOutline({ outline, scale, k, wave }: { outline: NonNullable<MapOu
   const unit = scale * k; // viewBox 1 = B3에서 unit dp
   const liftStyle = useAnimatedStyle(() => ({ transform: [{ translateY: -pieceLift(wave, shape.piece) }] }));
   const lineProps = useAnimatedProps(() => ({ strokeDashoffset: shape.len * (1 - draw.value) }));
-  const fillProps = useAnimatedProps(() => ({ fillOpacity: 0.2 * interpolate(draw.value, [0.4, 1], [0, 1], Extrapolation.CLAMP) }));
+  const fillProps = useAnimatedProps(() => ({ fillOpacity: OUTLINE_FILL * interpolate(draw.value, [0.4, 1], [0, 1], Extrapolation.CLAMP) }));
   const extraProps = useAnimatedProps(() => ({ strokeOpacity: interpolate(draw.value, [0.5, 1], [0, 1], Extrapolation.CLAMP) }));
   const dash = [shape.len, shape.len];
   return (
@@ -172,7 +172,7 @@ export function IntroVeil({ geo, zoom }: { geo: DiscoverGeometry; zoom: SharedVa
 }
 
 /**
- * 핀·바닥 그림자·글로우·지역 라벨. 지도와 같은 변환을 따라 화면 좌표에 그립니다.
+ * 핀·바닥 그림자·지역 라벨 (뽑힌 지역은 점선 원 대신 시군구 경계선으로 보여 줍니다). 지도와 같은 변환을 따라 화면 좌표에 그립니다.
  * 손에 든 핀은 버튼 위에서 떨리고, 던지면 손 → 지도로 포물선을 그리며 끝이 앞서도록 돌아갑니다.
  */
 export function PinLayer({
@@ -242,15 +242,6 @@ export function PinLayer({
     };
   });
 
-  const glowStyle = useAnimatedStyle(() => {
-    const p = tip.value;
-    const g = pin.glow.value;
-    return {
-      opacity: g,
-      transform: [{ translateX: p.x + GLOW.dx - GLOW.width / 2 }, { translateY: p.y + GLOW.dy - GLOW.height / 2 }, { scale: 0.6 + 0.4 * g }],
-    };
-  });
-
   const pinStyle = useAnimatedStyle(() => {
     const s = pose.value;
     const squash = pin.squash.value;
@@ -284,9 +275,6 @@ export function PinLayer({
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none" importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
       <Animated.View style={[styles.ground, groundStyle]} />
-      <Animated.View style={[styles.layer, glowStyle]}>
-        <Icons.SelectedAreaGlow width={GLOW.width} height={GLOW.height} />
-      </Animated.View>
       <Animated.View style={[styles.layer, styles.pin, pinStyle]}>
         <Icons.PinDestination width={PIN.width} height={PIN.height} />
       </Animated.View>

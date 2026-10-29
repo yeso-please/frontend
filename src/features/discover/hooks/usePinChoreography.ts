@@ -43,7 +43,7 @@ export const PIN_MODE = { map: 0, held: 1, flying: 2 } as const;
  * - mode: 지도 위 / 손에 듦(버튼 위에서 떨림) / 날아가는 중(손 → 지도로 포물선)
  * - u, v: 지도 위 위치(0~1) · lift: 지면에서 띄운 높이(px, 음수 = 위)
  * - holdX, holdY: 손에 든 핀 끝의 화면 좌표 · fly: 비행 진행 0~1 · power: 모은 힘 0~1
- * - squash: 세로 배율(착지 순간 눌림) · glow: 착지 후 바닥 빛 · label: 지역 라벨 팝
+ * - squash: 세로 배율(착지 순간 눌림) · label: 지역 라벨 팝
  * throwTo·land는 그 동작이 끝날 때 resolve되는 Promise를 돌려줍니다 (취소되면 resolve되지 않음).
  */
 export function usePinChoreography() {
@@ -54,29 +54,26 @@ export function usePinChoreography() {
   const lift = useSharedValue(0);
   const squash = useSharedValue(1);
   const opacity = useSharedValue(0);
-  const glow = useSharedValue(0);
   const label = useSharedValue(0);
   const holdX = useSharedValue(0);
   const holdY = useSharedValue(0);
   const fly = useSharedValue(0);
   const power = useSharedValue(0);
 
-  const all = [mode, u, v, lift, squash, opacity, glow, label, holdX, holdY, fly, power];
+  const all = [mode, u, v, lift, squash, opacity, label, holdX, holdY, fly, power];
   // 화면이 사라지면 진행 중인 연출을 멈춥니다.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => () => all.forEach((sv) => cancelAnimation(sv)), []);
 
   const stopMotion = () => [u, v, lift, squash, fly].forEach((sv) => cancelAnimation(sv));
 
-  /** 결과 표시: 바닥 빛이 퍼지고 라벨이 톡 튀어나옵니다. */
+  /** 결과 표시: 라벨이 톡 튀어나옵니다. */
   const showResult = () => {
-    glow.set(withTiming(1, motion.timing.base));
     label.set(withSpring(1, motion.spring.bouncy));
   };
 
-  /** 다시 뽑기: 라벨·바닥 빛을 거둡니다. */
+  /** 다시 뽑기: 라벨을 거둡니다. */
   const hideResult = () => {
-    glow.set(withTiming(0, motion.timing.fast));
     label.set(withTiming(0, motion.timing.fast));
   };
 
@@ -205,7 +202,7 @@ export function usePinChoreography() {
     });
 
   return {
-    pin: { mode, u, v, lift, squash, opacity, glow, label, holdX, holdY, fly, power },
+    pin: { mode, u, v, lift, squash, opacity, label, holdX, holdY, fly, power },
     reducedMotion,
     hold,
     drop,
