@@ -48,9 +48,6 @@ export function MyCoursesScreen() {
   return (
     <Screen>
       <View style={styles.header}>
-        <AppText variant="badge" color="green" style={styles.eyebrow}>
-          MY TRIP
-        </AppText>
         <AppText variant="title" accessibilityRole="header">
           내 코스
         </AppText>
@@ -156,7 +153,7 @@ function CourseCard({ trip, index, status, hasDiary, diaryLoading, onDiary }: Ca
         </View>
         <View style={styles.body}>
           <View style={styles.titleRow}>
-            <AppText variant="label" numberOfLines={2} style={styles.flex}>
+            <AppText variant="label" numberOfLines={1} style={styles.flex}>
               {title}
             </AppText>
             <View style={[styles.status, STATUS_STYLE[status].box]}>
@@ -169,8 +166,8 @@ function CourseCard({ trip, index, status, hasDiary, diaryLoading, onDiary }: Ca
             {meta}
           </AppText>
           <View style={styles.chips}>
-            {trip.hasCourse ? <Chip label="AI 추천 코스" tone="green" /> : null}
-            {trip.participants.length > 1 ? <Chip label={`${trip.participants.length}명이 함께`} tone="blue" /> : null}
+            {trip.hasCourse ? <Chip label="AI가 작성" tone="green" /> : null}
+            {trip.participants.length > 1 ? <Chip label={`${trip.participants.length}명의 취향 반영`} tone="blue" /> : null}
             {trip.retroactive ? <Chip label="지난 여행 기록" tone="green" /> : null}
           </View>
           <Button label={action.label} variant={action.variant} height={40} loading={action.loading} onPress={action.onPress} style={styles.action} />
@@ -200,7 +197,6 @@ const STATUS_STYLE: Record<CourseStatus, { box: { backgroundColor: string }; tex
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   header: { paddingHorizontal: screenPadding, paddingTop: space[24], paddingBottom: space[16], gap: 2 },
-  eyebrow: { fontFamily: fonts.bold, letterSpacing: 1.3 },
   filters: { flexDirection: "row", paddingHorizontal: space[16], borderBottomWidth: 1, borderBottomColor: colors.border },
   filter: { flex: 1, height: 46, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: space[4] },
   count: { minWidth: 18, height: 18, paddingHorizontal: space[4], borderRadius: radius.pill, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
