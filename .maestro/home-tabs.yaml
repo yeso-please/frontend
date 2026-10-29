@@ -1,14 +1,14 @@
 appId: com.yesoplease.tripin
-name: 홈 → 여행 → 내 코스 → MY → 나의 여행 지도
+name: 홈 → 여행 → 저장(내 코스) → MY → 나의 여행 지도
 tags: [smoke]
 ---
 # 로그인된 상태에서 시작합니다 (비밀번호를 흐름에 넣지 않습니다).
 - runFlow: common/launch.yaml
 - assertVisible: "나의 여행 성향"
 - tapOn: "여행"
-# 하단 탭 4칸: 홈 · 여행 · 내 코스 · MY
-- tapOn: "내 코스"
-- assertVisible: "MY TRIP"
+# 하단 탭 4칸: 홈 · 여행 · 저장 · MY (저장 탭 = 내 코스)
+- tapOn: "저장"
+- assertVisible: "내 코스"
 - assertVisible: "전체 [0-9]+개"
 - tapOn: "다녀옴 [0-9]+개"
 - assertVisible: "다녀옴 [0-9]+개"
