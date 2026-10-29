@@ -4,12 +4,15 @@
 그래서 실제 경계(시군구 250곳)를 그림 해안선에 맞게 부드럽게 휜 뒤(thin-plate spline), 그림의 땅 픽셀마다
 가장 가까운 시군구를 정합니다. 결과물:
 
-- assets/illustrations/korea-pieces/{시도코드}.webp — 도 단위 퍼즐 조각 17장 (경계선을 구워 넣음)
+- assets/illustrations/korea-pieces/{시도코드}-{내용 해시}.webp — 도 단위 퍼즐 조각 17장 (경계선을 구워 넣음)
+  이름에 내용 해시를 붙여, 다시 만들면 폰에 저장된(캐시) 옛 조각 대신 새 조각을 읽게 합니다.
 - src/features/discover/lib/koreaMap.generated.ts — 조각 위치·무게중심, 시군구 외곽선(SVG path)·핀 자리
 
 입력: 팀 데모 저장소의 시군구 경계 GeoJSON (vuski/admdongkor ver20220309, 키 SIG_CD = 백엔드 sigCd)
 실행: python scripts/korea-map/build.py [sig_original.json 경로]   (numpy·scipy·Pillow 필요)
 """
+import hashlib
+import io
 import json
 import math
 import pathlib
@@ -196,6 +199,8 @@ rgb = rgb * (1 - 0.94 * core[..., None]) + 0.94 * core[..., None]
 
 # ── 5. 도 조각 ──
 OUT_PIECES.mkdir(parents=True, exist_ok=True)
+for old in OUT_PIECES.glob("*.webp"):
+    old.unlink()
 # 해안 바깥 2px(그림의 부드러운 가장자리)까지 가장 가까운 조각에 붙입니다.
 _, (iy, ix) = ndi.distance_transform_edt(P < 0, return_indices=True)
 near = ndi.distance_transform_edt(~land) <= 2.5
@@ -207,9 +212,12 @@ for i, sc in enumerate(sido_codes):
     x0, y0, x1, y1 = xs.min(), ys.min(), xs.max() + 1, ys.max() + 1
     alpha = (base[..., 3] * m)[y0:y1, x0:x1]
     out = np.dstack([rgb[y0:y1, x0:x1], alpha])
-    Image.fromarray((out * 255).round().astype(np.uint8), "RGBA").save(OUT_PIECES / f"{sc}.webp", "WEBP", quality=88, method=6)
+    buf = io.BytesIO()
+    Image.fromarray((out * 255).round().astype(np.uint8), "RGBA").save(buf, "WEBP", quality=88, method=6)
+    file = f"{sc}-{hashlib.md5(buf.getvalue()).hexdigest()[:8]}.webp"
+    (OUT_PIECES / file).write_bytes(buf.getvalue())
     cy, cx = ndi.center_of_mass(P == i)
-    pieces.append({"sido": sc, "name": SIDO[sc], "x": int(x0), "y": int(y0), "w": int(x1 - x0), "h": int(y1 - y0),
+    pieces.append({"sido": sc, "file": file, "name": SIDO[sc], "x": int(x0), "y": int(y0), "w": int(x1 - x0), "h": int(y1 - y0),
                    "cu": round(cx / W, 4), "cv": round(cy / H, 4)})
 # 그리는 순서: 북쪽(뒤)부터 남쪽(앞)으로, 광역시는 도 위에
 pieces.sort(key=lambda p: (p["sido"] in METRO, p["cv"]))
@@ -321,7 +329,7 @@ lines = [
 for p in pieces:
     lines.append(
         f'  {{ sido: "{p["sido"]}", name: "{p["name"]}", x: {p["x"]}, y: {p["y"]}, w: {p["w"]}, h: {p["h"]}, cu: {p["cu"]}, cv: {p["cv"]}, '
-        f'source: require("@/assets/illustrations/korea-pieces/{p["sido"]}.webp") }},'
+        f'source: require("@/assets/illustrations/korea-pieces/{p["file"]}") }},'
     )
 lines += [
     "] as const;",
