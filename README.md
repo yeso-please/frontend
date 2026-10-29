@@ -29,6 +29,7 @@
 ## 목차
 
 - [소개](#소개)
+- [화면 미리보기](#화면-미리보기)
 - [주요 기능](#주요-기능)
 - [앱 설치하기](#앱-설치하기)
 - [기술 스택](#기술-스택)
@@ -51,6 +52,26 @@
 4. 다녀온 뒤에는 사진과 이야기로 **여행기**를 남기고, 사진을 찍은 곳이 **나의 여행 지도**에 핀으로 쌓입니다.
 
 이 저장소는 TriPin의 **안드로이드 앱(React Native)** 입니다. 서버·추천 모델·클라우드 설정은 [관련 저장소](#관련-저장소)에 있습니다.
+
+## 화면 미리보기
+
+<table>
+  <tr>
+    <td align="center" width="33%"><img src="docs/images/screens/home.webp" width="240" alt="홈" /><br /><b>홈</b><br /><sub>준비 중인 여행 · 나의 여행 성향</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/travel.webp" width="240" alt="핀 꽂기" /><br /><b>핀 꽂기</b><br /><sub>3D 지도에서 여행지 뽑기</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/pin.webp" width="240" alt="뽑힌 지역" /><br /><b>뽑힌 지역</b><br /><sub>다시 뽑거나 알아보기</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><img src="docs/images/screens/region.webp" width="240" alt="지역 추천" /><br /><b>지역 추천</b><br /><sub>대표 사진 · AI 맞춤 문장</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/course.webp" width="240" alt="함께 만드는 코스" /><br /><b>함께 만드는 코스</b><br /><sub>일차별 장소 카드 · 순서 바꾸기</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/course-map.webp" width="240" alt="코스 지도" /><br /><b>코스 지도</b><br /><sub>카카오맵 이동 경로</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><img src="docs/images/screens/place-info.webp" width="240" alt="관광지 정보" /><br /><b>관광지 정보</b><br /><sub>소개 · 이용 시간 · 쉬는 날</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/my-courses.webp" width="240" alt="내 코스" /><br /><b>내 코스</b><br /><sub>짜는 중 · 완성 · 다녀옴</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/persona.webp" width="240" alt="나의 여행 성향" /><br /><b>나의 여행 성향</b><br /><sub>16가지 여행 성향 캐릭터</sub></td>
+  </tr>
+</table>
 
 ## 주요 기능
 
