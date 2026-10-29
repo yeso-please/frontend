@@ -44,3 +44,6 @@ example
 
 # Reassure 성능 측정 결과
 .reassure/
+
+# 지도 조각 스크립트 미리보기 (scripts/korea-map/build.py)
+scripts/korea-map/_preview/
