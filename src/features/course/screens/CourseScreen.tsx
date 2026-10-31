@@ -235,7 +235,11 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
   const title = tripTitle(regionName, "새 여행");
   const regionShort = regionCard.data ? shortRegionName(regionCard.data.province, regionCard.data.city) : title.replace(/ 여행$/, "");
   const watching = presenceSentence(watchers);
-  const headerLine = watching ? { text: watching, live: true } : { text: "친구와 함께 장소를 추가·제외할 수 있어요." };
+  // 끝난 여행(다녀온 여행 기록 포함)은 여행기로 이어집니다. 친구 초대(TRIP_ENDED)·지금 위치 거리 보기는 감춥니다.
+  const ended = !!context.data && context.data.endDate < todayYmd();
+  const headerLine = watching
+    ? { text: watching, live: true }
+    : { text: ended ? "다녀온 여행이에요. 코스를 정리하고 여행기로 남겨 보세요." : "친구와 함께 장소를 추가·제외할 수 있어요." };
   const transport = context.data?.transport ?? "CAR";
 
   const alone = (participants.data?.length ?? 1) <= 1;
@@ -245,8 +249,6 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
     toast("여행 준비를 마쳤어요", { description: "코스는 여행 전까지 언제든 고칠 수 있어요." });
     router.dismissTo("/(tabs)");
   };
-  // 끝난 여행(다녀온 여행 기록 포함)은 여행기로 이어집니다.
-  const ended = !!context.data && context.data.endDate < todayYmd();
   let cta: { label: string; onPress: () => void; loading?: boolean; disabled?: boolean } | null = null;
   /** 혼자인 여행을 다시 열었을 때 작은 "친구 초대하기" 링크 (참여자 화면에는 초대 입구가 없습니다) */
   let inviteLink = false;
@@ -309,6 +311,7 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
               generating={generate.isPending}
               canGenerate={canGenerate}
               creatorNickname={creator?.nickname ?? null}
+              ended={ended}
             />
           )
         ) : (
@@ -321,7 +324,8 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
             onDayChange={setDayIndex}
             statusOverride={generate.isPending ? "새 코스를 만드는 중이에요…" : status}
             onOpenDetail={openDetail}
-            firstLegTripId={data.myRole === "PARTICIPANT" ? tripId : undefined}
+            firstLegTripId={data.myRole === "PARTICIPANT" && !ended ? tripId : undefined}
+            ended={ended}
             edit={
               data.myRole === "PARTICIPANT"
                 ? {

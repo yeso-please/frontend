@@ -32,6 +32,8 @@ type Props = {
   /** 최초 생성은 여행을 만든 사람만 (COURSE_CREATOR_ONLY). false면 기다리는 안내만 보여 줍니다 */
   canGenerate: boolean;
   creatorNickname: string | null;
+  /** 끝난 여행 — 친구 참여 안내를 뺍니다 */
+  ended?: boolean;
 };
 
 const STEPS = (region: string, me: string) => [
@@ -87,7 +89,7 @@ function GeneratingIndicator({ region, me }: { region: string; me: string }) {
 }
 
 /** E0 · 첫 코스 만들기 전 — 생성 안내와 "내 여행 성향 반영 / 완전 랜덤" (코스 생성은 요청자의 이 설정을 씁니다) */
-export function GenerateCourseView({ myNickname, regionShort, days, generating, canGenerate, creatorNickname }: Props) {
+export function GenerateCourseView({ myNickname, regionShort, days, generating, canGenerate, creatorNickname, ended }: Props) {
   const queryClient = useQueryClient();
   const preferences = useQuery({ queryKey: queryKeys.preferences, queryFn: preferencesApi.get, enabled: canGenerate });
   const mode = preferences.data?.courseTasteMode ?? "TASTE";
@@ -126,7 +128,7 @@ export function GenerateCourseView({ myNickname, regionShort, days, generating, 
           {`${myNickname}님의 취향으로 첫 코스를 만들어요`}
         </AppText>
         <AppText variant="small13" color="darkgreen">
-          {`${regionShort}에서 ${days}일 동안 들를 장소와 점심·저녁 식당을 순서대로 골라 드려요. 친구들은 참여 후 장소를 추가·제외·교체할 수 있어요.`}
+          {`${regionShort}에서 ${days}일 동안 들를 장소와 점심·저녁 식당을 순서대로 골라 드려요.${ended ? "" : " 친구들은 참여 후 장소를 추가·제외·교체할 수 있어요."}`}
         </AppText>
       </View>
       <View style={styles.modeBlock}>

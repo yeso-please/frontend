@@ -5,7 +5,7 @@ import { AppText } from "@/components/ui";
 import { colors, radius, space } from "@/theme";
 
 /** 피그마 E1 "수정님의 취향 기반 코스" 민트 상자 — 추천 방식·AI 소개 */
-export function TasteBasisBox({ course }: { course: Course }) {
+export function TasteBasisBox({ course, ended }: { course: Course; ended?: boolean }) {
   const basis = course.tasteBasis?.nickname;
   const mode = course.recommendationMode;
   const heading =
@@ -43,9 +43,11 @@ export function TasteBasisBox({ course }: { course: Course }) {
       <AppText variant="small13" color="darkgreen">
         {course.intro ?? fallbackBody}
       </AppText>
-      <AppText variant="small12" color="darkgreen" style={styles.hint}>
-        친구들은 참여 후 장소를 추가·제외·교체할 수 있어요.
-      </AppText>
+      {ended ? null : (
+        <AppText variant="small12" color="darkgreen" style={styles.hint}>
+          친구들은 참여 후 장소를 추가·제외·교체할 수 있어요.
+        </AppText>
+      )}
     </View>
   );
 }
