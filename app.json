@@ -38,6 +38,14 @@
           "microphonePermission": false
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "코스 첫 장소까지 지금 위치에서 얼마나 걸리는지 보여 드리려고 위치를 써요.",
+          "isAndroidBackgroundLocationEnabled": false,
+          "isIosBackgroundLocationEnabled": false
+        }
+      ],
       "./plugins/withKakaoMapCleartext"
     ],
     "experiments": {

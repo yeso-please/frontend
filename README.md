@@ -93,8 +93,9 @@
 
 - 카드를 끌어 순서 바꾸기
 - 장소 바꾸기 · 빼기, 지도를 움직이며 그 범위 관광지에서 **장소 추가**
-- 식사 자리에 식당 고르기, 이동 경로 지도 보기
-- 관광지 정보(사진 · 소개 · 이용 시간 · 휴무일) 보기
+- 코스 위 장소 사진을 옆으로 넘겨 보기, 카드의 **상세보기**로 관광지 정보(사진 · 소개 · 이용 시간 · 휴무일 · 출처)
+- 식사 자리에 식당 고르기(추천 이유 표시), 점심 · 저녁을 빼거나 다시 넣기, 이동 경로 지도 보기
+- **지금 위치에서 첫 장소까지** 자동차 · 도보 · 대중교통 시간 (버튼을 누를 때만 위치 권한을 묻고 위치는 저장하지 않음)
 - 지금 누가 같은 코스를 보고 있는지 표시하고, 동시에 고쳐 충돌하면 최신 코스로 다시 맞춤
 
 #### 코스 공유
@@ -163,6 +164,7 @@
 | 목록 · 달력 | [FlashList](https://github.com/Shopify/flash-list) 2, [Flash Calendar](https://github.com/MarceloPrado/flash-calendar) |
 | 지도 | 카카오맵 JavaScript SDK (WebView), 직접 그린 3D 지형 지도 |
 | 미디어 | expo-image, expo-image-picker, expo-file-system (사진 multipart 업로드) |
+| 위치 | expo-location (앱 사용 중 권한만, 코스 첫 장소 거리) |
 | 보안 저장 | expo-secure-store (refresh 토큰) |
 | 기타 | react-native-svg(+ svg transformer), sonner-native(토스트), expo-haptics, expo-linear-gradient |
 | 테스트 | Jest(jest-expo), [React Native Testing Library](https://github.com/callstack/react-native-testing-library), [Reassure](https://github.com/callstack/reassure), [Maestro](https://github.com/mobile-dev-inc/Maestro), [Flashlight](https://github.com/bamlab/flashlight) |

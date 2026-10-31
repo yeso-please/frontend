@@ -5,6 +5,7 @@ import type {
   Alternatives,
   AttractionCategory,
   AttractionDetail,
+  CourseFirstLeg,
   AttractionPins,
   AuthResponse,
   ContextCheck,
@@ -140,6 +141,9 @@ export const courseApi = {
     api.get<RestaurantRecommendations>(`/courses/${tripId}/restaurants/recommendations`, { query: { itemId, radius } }),
   restaurantSearch: (tripId: number, params: { itemId: string; query?: string; radius?: number; page?: number }) =>
     api.get<RestaurantSearch>(`/courses/${tripId}/restaurants/search`, { query: params }),
+  /** 5-8 지금 위치 → 그날 첫 관광지 (참여자). 좌표는 query로만 보내고 저장하지 않습니다 */
+  firstLeg: (tripId: number, dayIndex: number, lat: number, lng: number) =>
+    api.get<CourseFirstLeg>(`/courses/${tripId}/first-leg`, { query: { dayIndex, lat, lng }, timeoutMs: 30000 }),
   /** 5-7 지도 경로 — 수단을 바꿔 부를 수 있습니다 */
   routes: (tripId: number, dayIndex: number, transport?: Transport) =>
     api.get<CourseRoutes>(`/courses/${tripId}/routes`, { query: { dayIndex, transport }, timeoutMs: 30000 }),

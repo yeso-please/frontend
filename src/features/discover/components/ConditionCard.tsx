@@ -18,7 +18,7 @@ type Props = {
 /**
  * 피그마 B1 숨김 레이어 Region conditions (24,270 · 342×248): 제목·닫기, 조건 칩, 안내, 확인 버튼.
  * 서버 조건 추첨(7-5 CONDITIONAL)은 거리(DISTANCE)·내 취향(MY_TASTE)뿐이고(디자인의 바다·도시·자연 칩은 Q9로 보류),
- * 앱은 위치 권한(expo-location)이 없어 거리 조건 없이 "완전 랜덤 / 내 취향"만 고릅니다.
+ * 거리 조건은 아직 쓰지 않아 "완전 랜덤 / 내 취향"만 고릅니다 (위치는 코스 첫 장소 거리(5-8)에만 씁니다).
  */
 export function ConditionCard({ top, conditions, onClose, onApply }: Props) {
   const [taste, setTaste] = useState(conditions.includes("MY_TASTE"));

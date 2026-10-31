@@ -9,6 +9,7 @@ import { colors, motion, radius, space } from "@/theme";
 import { dayChangeSummary, latestChangeSentence } from "../format";
 import { MealCard, PlaceCard, RemovedCard } from "./CourseCards";
 import { CoursePhotoStrip } from "./CoursePhotoStrip";
+import { FirstLegBox } from "./FirstLegBox";
 import { DayTabs } from "./DayTabs";
 import { type DragScroll, DraggableList, ROW_GAP } from "./DraggableList";
 import { SegmentedTabs } from "./SegmentedTabs";
@@ -43,12 +44,14 @@ type Props = {
   };
   /** 관광지 상세 시트 열기 (7-4는 회원 전용이라 공유·비회원 화면에서는 넘기지 않습니다) */
   onOpenDetail?: (attractionId: number) => void;
+  /** 참여자 화면이면 그날 첫 장소 위에 "지금 위치에서 거리 보기" (5-8 참여자 전용) */
+  firstLegTripId?: number;
   /** 목록 아래 덧붙일 내용 (예: 코스 다시 만들기) */
   footer?: ReactNode;
 };
 
 /** 함께 만드는 코스 본문 — 취향 상자 · 전체 보기/변경 표시 · 일차 탭 · 상태 줄 · 카드 목록 (E1·E2·E4·E5~E8) */
-export function CourseBody({ course, transport, tab, onTabChange, dayIndex, onDayChange, statusOverride, edit, onOpenDetail, footer }: Props) {
+export function CourseBody({ course, transport, tab, onTabChange, dayIndex, onDayChange, statusOverride, edit, onOpenDetail, firstLegTripId, footer }: Props) {
   const day = course.days.find((d) => d.dayIndex === dayIndex) ?? course.days[0];
   const dayChanges = course.changes?.days.find((d) => d.dayIndex === day?.dayIndex);
   const removed = (course.changes?.removed ?? []).filter((r) => r.dayIndex === day?.dayIndex);
@@ -107,6 +110,11 @@ export function CourseBody({ course, transport, tab, onTabChange, dayIndex, onDa
             </AppText>
           </PressableScale>
         </View>
+      ) : null}
+
+      {/* 날짜를 바꿔도 받은 위치를 그대로 쓰도록 날짜 목록 밖(첫 장소 바로 위)에 둡니다 */}
+      {day && firstLegTripId != null && tab === "all" && day.items.some((i) => i.type === "ATTRACTION") ? (
+        <FirstLegBox tripId={firstLegTripId} dayIndex={day.dayIndex} />
       ) : null}
 
       {day ? (

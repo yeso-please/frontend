@@ -14,7 +14,7 @@ type DiscoverState = {
   mode: DrawMode;
   /** 화면(헤드라인·라벨·시트)에 보여 주는 결과. 다시 뽑는 동안에는 이전 결과를 유지합니다. */
   result: DiscoveredRegion | null;
-  /** 조건 뽑기 (D1: DISTANCE·MY_TASTE 중 앱은 위치 권한이 없어 MY_TASTE만 씁니다). 비면 완전 랜덤 */
+  /** 조건 뽑기 (D1: DISTANCE·MY_TASTE 중 거리 조건은 아직 쓰지 않아 MY_TASTE만). 비면 완전 랜덤 */
   conditions: DrawCondition[];
   /** B4 "다시 뽑기" → 여행 탭이 포커스를 받으면 다시 뽑습니다 (값이 바뀔 때마다 한 번) */
   redrawRequest: number;

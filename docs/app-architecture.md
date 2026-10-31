@@ -39,7 +39,7 @@ MY: 프로필·성향·친구(M1), 친구 목록(M2), 친구 초대 링크 보�
   - 일정 밀도(`scheduleDensity`)는 보내지 않습니다. 서버가 MBTI J/P로 정합니다.
 - **성향 콘텐츠:** 백엔드 `travel-personas.json`을 `src/features/mbti/travel-personas.json`으로 복사해 프론트 상수로 씁니다(D4). 문구를 바꾸면 백엔드 파일도 함께 바꿉니다. 캐릭터는 피그마에서 받은 16유형 그림을 씁니다.
 - **지역 뽑기:**
-  - 서버 `POST /regions/draw`(RANDOM, 또는 CONDITIONAL MY_TASTE)를 씁니다. 거리 조건은 위치 권한 패키지가 없어 아직 뺐습니다.
+  - 서버 `POST /regions/draw`(RANDOM, 또는 CONDITIONAL MY_TASTE)를 씁니다. 거리 조건은 아직 뺐습니다. 위치(expo-location, 앱 사용 중 권한만)는 코스 화면 "지금 위치에서 거리 보기"(5-8)에서 버튼을 누를 때만 묻고, 좌표는 저장하지 않습니다.
   - 결과의 `maxNights`로 날짜 화면에서 긴 일정을 막습니다.
   - 지도에서 직접 고르면 `MANUAL`입니다.
 - **코스 생성:**

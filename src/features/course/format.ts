@@ -1,4 +1,4 @@
-import type { AttractionItem, CourseChanges, CourseItem, TravelLeg, Transport, UserRef } from "@/api/types";
+import type { AttractionItem, CourseChanges, CourseFirstLeg, CourseItem, FirstLegMode, Transport, TravelLeg, UserRef } from "@/api/types";
 import { shortRegionName, withEulReul, withEuro, withIGa } from "@/lib/josa";
 
 // 코스 화면 문구·이동 시간 표시 규칙 (백엔드 frontend-guide "이동 시간 표시(D5)", "변경 기록 D11").
@@ -21,6 +21,23 @@ export function formatDistance(meters: number) {
   if (meters < 1000) return `${Math.round(meters / 10) * 10}m`;
   const km = meters / 1000;
   return km >= 10 ? `${Math.round(km)}km` : `${km.toFixed(1).replace(/\.0$/, "")}km`;
+}
+
+/** 1,500 처럼 세 자리마다 쉼표 (Hermes Intl에 기대지 않음) */
+const withComma = (n: number) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+/**
+ * 5-8 지금 위치 → 첫 관광지 한 줄: "🚗 9분 3.1km · 🚶 38분 · 🚌 21분(환승 0, 1,500원)".
+ * 직선 추정(STRAIGHT)은 "약 N분(직선 추정)", 도보가 null(10km 초과)이면 뺍니다.
+ */
+export function firstLegParts(leg: CourseFirstLeg): { mode: Transport; text: string }[] {
+  const time = (m: FirstLegMode) => (m.source === "STRAIGHT" ? `약 ${formatMinutes(m.durationMinutes)}(직선 추정)` : formatMinutes(m.durationMinutes));
+  const parts: { mode: Transport; text: string }[] = [{ mode: "CAR", text: `🚗 ${time(leg.car)} ${formatDistance(leg.car.distanceMeters)}` }];
+  if (leg.walk) parts.push({ mode: "WALK", text: `🚶 ${time(leg.walk)}` });
+  const t = leg.transit;
+  const extra = [t.transfers != null ? `환승 ${t.transfers}` : null, t.fare != null ? `${withComma(t.fare)}원` : null].filter(Boolean).join(", ");
+  parts.push({ mode: "PUBLIC_TRANSIT", text: `🚌 ${time(t)}${t.source === "TRANSIT" && extra ? `(${extra})` : ""}` });
+  return parts;
 }
 
 export type TravelModeTime = {

@@ -23,7 +23,7 @@ import type {
   UserRef,
 } from "../types";
 import { addDays, fail, isYmd, MockError, nowIso, ok, type Raw, today, token } from "./common";
-import { alternatives, applyOperations, generateCourse, type MockCourse, restaurantRecommendations, restaurantSearch, routes, toCourse } from "./course";
+import { alternatives, applyOperations, firstLeg, generateCourse, type MockCourse, restaurantRecommendations, restaurantSearch, routes, toCourse } from "./course";
 import { attractionsFor, BASE_REGIONS, distanceMeters, findAttraction, findRegion, isEligible, maxNightsFor, regionName, regionShortName } from "./data";
 import { computeMbti, MOCK_MBTI_QUESTIONS } from "./mbti";
 
@@ -1092,6 +1092,11 @@ on("GET", "/courses/:id/restaurants/search", ({ db: d, me, query }, [id]) => {
   return ok(
     restaurantSearch(trip, courseOf(d, trip), { itemId: query.get("itemId"), query: query.get("query"), radius: query.get("radius"), page: query.get("page") }),
   );
+});
+
+on("GET", "/courses/:id/first-leg", ({ db: d, me, query }, [id]) => {
+  const trip = findTrip(d, me!, id);
+  return ok(firstLeg(trip, courseOf(d, trip), query.get("dayIndex"), query.get("lat"), query.get("lng")));
 });
 
 on("GET", "/courses/:id/routes", ({ db: d, me, query }, [id]) => {

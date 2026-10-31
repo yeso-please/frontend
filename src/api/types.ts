@@ -482,6 +482,27 @@ export type RestaurantRecommendations = {
   sections: { source: RestaurantProvider; label: string; items: RestaurantCandidate[] }[];
 };
 export type RestaurantSearch = { itemId: string; origin: RestaurantOrigin; page: number; isEnd: boolean; items: RestaurantCandidate[] };
+/** 5-8 지금 위치 → 그날 첫 관광지. source가 STRAIGHT면 실패·시간 초과로 직선 추정, walk는 직선 10km 넘으면 null */
+export type FirstLegMode = {
+  source: "ROAD" | "WALK" | "TRANSIT" | "STRAIGHT";
+  distanceMeters: number;
+  durationMinutes: number;
+  transfers: number | null;
+  fare: number | null;
+};
+export type CourseFirstLeg = {
+  tripId: number;
+  dayIndex: number;
+  itemId: string;
+  attractionId: number;
+  name: string;
+  lat: number;
+  lng: number;
+  straightMeters: number;
+  car: FirstLegMode;
+  walk: FirstLegMode | null;
+  transit: FirstLegMode;
+};
 export type RouteLeg = {
   fromItemId: string;
   toItemId: string;

@@ -19,6 +19,8 @@ export const queryKeys = {
   presence: (tripId: number) => ["trips", tripId, "presence"] as const,
   course: (tripId: number) => ["trips", tripId, "course"] as const,
   routes: (tripId: number, dayIndex: number, transport: string) => ["trips", tripId, "course", "routes", dayIndex, transport] as const,
+  /** 위치는 100m 단위로 묶어 키에 넣습니다 (메모리 캐시만, 저장하지 않음) */
+  firstLeg: (tripId: number, dayIndex: number, latKey: number, lngKey: number) => ["trips", tripId, "course", "first-leg", dayIndex, latKey, lngKey] as const,
   alternatives: (tripId: number, itemId: string | null, q?: string) => ["trips", tripId, "course", "alternatives", itemId ?? "add", q ?? ""] as const,
   restaurants: (tripId: number, itemId: string) => ["trips", tripId, "course", "restaurants", itemId] as const,
   unavailableDates: (from: string, to: string) => ["trips", "unavailable", from, to] as const,

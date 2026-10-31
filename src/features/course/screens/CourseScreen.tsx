@@ -314,6 +314,7 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
             onDayChange={setDayIndex}
             statusOverride={generate.isPending ? "새 코스를 만드는 중이에요…" : status}
             onOpenDetail={openDetail}
+            firstLegTripId={data.myRole === "PARTICIPANT" ? tripId : undefined}
             edit={
               data.myRole === "PARTICIPANT"
                 ? {

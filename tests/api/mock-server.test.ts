@@ -493,6 +493,17 @@ describe("코스 편집 (5-3)·대체 후보 (5-4)·식당 (5-5)", () => {
     }
   });
 
+  it("첫 장소 거리(5-8): 그날 첫 관광지까지 세 수단, 국내 밖 좌표는 400", async () => {
+    const { token } = await onboarded();
+    const { trip, course } = await tripWithCourse(token);
+    const first = course.days[0].items.find((i) => i.type === "ATTRACTION")!;
+    const leg = await call<{ itemId: string; car: { durationMinutes: number }; transit: { source: string } }>("GET", `/courses/${trip.id}/first-leg?dayIndex=0&lat=37.5665&lng=126.978`, undefined, token);
+    expect(leg.json.itemId).toBe(first.itemId);
+    expect(leg.json.car.durationMinutes).toBeGreaterThan(0);
+    expect(leg.json.transit.source).toBe("STRAIGHT");
+    expect((await call("GET", `/courses/${trip.id}/first-leg?dayIndex=0&lat=48.85&lng=2.35`, undefined, token)).json.code).toBe("COMMON_INVALID_REQUEST");
+  });
+
   it("점심을 빼면(REMOVE 식사) 칸이 사라지고 제외 기록엔 남지 않으며, ADD_MEAL로 다시 넣고 같은 끼니 중복은 400", async () => {
     const { token } = await onboarded();
     const { trip, course } = await tripWithCourse(token);

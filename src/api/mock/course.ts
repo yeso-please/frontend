@@ -6,6 +6,7 @@ import type {
   ChangeOrigin,
   Course,
   CourseChanges,
+  CourseFirstLeg,
   CourseItem,
   CourseRoutes,
   CourseWarning,
@@ -682,4 +683,32 @@ export function routes(trip: CourseTrip, course: MockCourse, dayIndexParam: stri
     };
   });
   return { tripId: trip.id, version: trip.version, dayIndex, transport, legs };
+}
+
+// ── 첫 장소 거리 (5-8) — 목업은 세 수단 모두 직선 추정, 도보는 10km 넘으면 null ──
+export function firstLeg(trip: CourseTrip, course: MockCourse, dayIndexParam: string | null, latParam: string | null, lngParam: string | null): CourseFirstLeg {
+  const bad = () => new MockError(400, "COMMON_INVALID_REQUEST", "요청 값이 올바르지 않습니다.");
+  const dayIndex = dayIndexParam === null ? 0 : Number(dayIndexParam);
+  const lat = Number(latParam);
+  const lng = Number(lngParam);
+  if (latParam === null || lngParam === null || !(lat >= 33 && lat <= 39 && lng >= 124 && lng <= 132)) throw bad();
+  if (!Number.isInteger(dayIndex) || dayIndex < 0 || dayIndex >= course.days.length) throw bad();
+  const item = course.days[dayIndex].find((i) => i.type === "ATTRACTION");
+  const a = item?.type === "ATTRACTION" ? findAttraction(item.attractionId) : undefined;
+  if (!item || !a) throw bad();
+  const meters = distanceMeters({ lat, lng }, a);
+  const mode = (transport: Transport) => ({ source: "STRAIGHT" as const, distanceMeters: meters, durationMinutes: estimateMinutes(meters, transport), transfers: null, fare: null });
+  return {
+    tripId: trip.id,
+    dayIndex,
+    itemId: item.itemId,
+    attractionId: a.attractionId,
+    name: a.name,
+    lat: a.lat,
+    lng: a.lng,
+    straightMeters: meters,
+    car: mode("CAR"),
+    walk: meters > 10_000 ? null : mode("WALK"),
+    transit: mode("PUBLIC_TRANSIT"),
+  };
 }
