@@ -27,7 +27,8 @@ type DiscoverState = {
   requestRedraw: () => void;
 };
 
-// 탭을 오가거나 B4·여행 만들기 화면에서 돌아와도 마지막 결과가 남도록 화면 밖(zustand)에 둡니다.
+// B4(지역 상세)·날짜 고르기에 다녀와도 마지막 결과가 남도록 화면 밖(zustand)에 둡니다.
+// 다른 탭으로 옮기거나(TabBar) 로그아웃하거나(auth signOut) 그 지역으로 여행을 만들면(날짜 화면) 비웁니다.
 export const useDiscoverDraw = create<DiscoverState>((set) => ({
   phase: "idle",
   mode: "random",

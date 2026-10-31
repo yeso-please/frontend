@@ -21,6 +21,7 @@ import { addDays, diffDays, formatNights, formatRange, todayYmd } from "@/lib/da
 import { haptics } from "@/lib/haptics";
 import { shortRegionName, withEunNeun } from "@/lib/josa";
 import { useAuthStore } from "@/store/auth";
+import { useDiscoverDraw } from "@/features/discover/store";
 import { useTripDraft } from "@/store/tripDraft";
 import { colors, motion, screenPadding, space } from "@/theme";
 
@@ -167,6 +168,8 @@ export default function TripDatesScreen() {
       const draft = useTripDraft.getState();
       draft.setDates(start, nights);
       draft.setTripId(trip.id);
+      // 그 지역으로 여행을 만들었으니 여행 탭은 처음 지도로 돌아갑니다.
+      useDiscoverDraw.getState().clear();
       haptics.confirm();
       router.replace({ pathname: "/trip/[tripId]/invite", params: { tripId: String(trip.id) } });
     } catch (e) {

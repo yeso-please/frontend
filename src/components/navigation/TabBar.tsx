@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Icons } from "@/components/icons";
 import { AppText, PressableScale } from "@/components/ui";
+import { useDiscoverDraw } from "@/features/discover/store";
 import { colors, motion } from "@/theme";
 
 type TabMeta = { label: string; icon: (active: boolean) => React.ReactNode };
@@ -59,7 +60,10 @@ export function TabBar({ state, navigation }: BottomTabBarProps) {
             focused={focused}
             onPress={() => {
               const event = navigation.emit({ type: "tabPress", target: route.key, canPreventDefault: true });
-              if (!focused && !event.defaultPrevented) navigation.navigate(route.name);
+              if (focused || event.defaultPrevented) return;
+              // 여행 탭을 떠나면 지역 뽑기 결과를 비웁니다 (돌아오면 처음 지도). 지역 상세·날짜 고르기는 탭 위에 쌓이는 화면이라 그대로 남습니다.
+              if (state.routes[state.index]?.name === "travel") useDiscoverDraw.getState().clear();
+              navigation.navigate(route.name);
             }}
           />
         );

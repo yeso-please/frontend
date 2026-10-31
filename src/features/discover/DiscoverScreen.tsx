@@ -74,7 +74,7 @@ export function DiscoverScreen() {
   const redrawRequest = useDiscoverDraw((s) => s.redrawRequest);
   const [conditionsOpen, setConditionsOpen] = useState(false);
 
-  // 탭을 오가거나 B4에서 돌아와도 마지막 결과를 그대로 보여 줍니다 (다시 뽑기 전까지 초기화하지 않음).
+  // B4(지역 상세)·날짜 고르기에서 돌아오면 마지막 결과를 그대로 보여 줍니다. 다른 탭으로 옮기면 TabBar가 비웁니다.
   const [restored] = useState(() => {
     const s = useDiscoverDraw.getState();
     return s.phase !== "idle" && !!s.result;
@@ -280,6 +280,25 @@ export function DiscoverScreen() {
     zoom.set(withSpring(0, motion.spring.gentle));
     useDiscoverDraw.getState().clear();
   };
+
+  // 다른 탭에 다녀오는 동안 결과가 비워졌으면(TabBar·로그아웃·여행 만들기) 화면도 처음 지도로 곧장 되돌립니다.
+  useFocusEffect(
+    useCallback(() => {
+      const s = useDiscoverDraw.getState();
+      if (s.phase !== "idle" || s.result) return;
+      drawIdRef.current += 1;
+      stopTicks();
+      setHolding(false);
+      stopWave();
+      choreo.reset();
+      choreo.hideResult();
+      zoom.set(0);
+      sheet.set(0);
+      outlineDraw.set(0);
+      // 포커스를 받을 때마다 한 번 확인합니다 (shared value·ref만 만집니다).
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []),
+  );
 
   // B4 "다시 뽑기" → 이 탭으로 돌아오면 다시 뽑습니다.
   const lastRedraw = useRef(redrawRequest);
