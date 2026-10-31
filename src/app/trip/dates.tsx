@@ -191,7 +191,7 @@ export default function TripDatesScreen() {
         // 라우트 가드가 설문 화면으로 보냅니다.
         useAuthStore.getState().setOnboardingCompleted(false);
       } else if (isApiError(e, "TRIP_INVALID_NIGHTS")) {
-        toast("여행 기간은 당일부터 6박 7일까지예요");
+        toast("여행 기간은 당일치기부터 6박 7일까지예요");
       } else if (isApiError(e, "REGION_NOT_FOUND")) {
         setNotice({ title: "여행지 정보를 찾을 수 없어요", lines: ["여행 탭에서 지역을 다시 골라 주세요."], redraw: true });
       } else {
@@ -276,7 +276,7 @@ export default function TripDatesScreen() {
 
           <View style={styles.helpers}>
             <AppText variant="small12" color="muted">
-              당일부터 최대 6박 7일까지 선택할 수 있어요.
+              당일치기부터 최대 6박 7일까지 선택할 수 있어요.
             </AppText>
             {regionLimited || rangeIssue ? (
               <View style={styles.limitRow}>
