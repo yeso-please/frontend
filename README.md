@@ -77,7 +77,19 @@
     <td align="center" width="33%"><img src="docs/images/screens/my-courses.webp" width="240" alt="내 코스" /><br /><b>내 코스</b><br /><sub>저장 탭 · 짜는 중 · 완성 · 다녀옴</sub></td>
     <td align="center" width="33%"><img src="docs/images/screens/persona.webp" width="240" alt="나의 여행 성향" /><br /><b>나의 여행 성향</b><br /><sub>16가지 여행 성향 캐릭터</sub></td>
   </tr>
+  <tr>
+    <td align="center" width="33%"><img src="docs/images/screens/diary-dates.webp" width="240" alt="다녀온 여행 기록" /><br /><b>다녀온 여행 기록</b><br /><sub>지난 날짜도 골라 사후 기록</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/diary-course.webp" width="240" alt="다녀온 여행 코스" /><br /><b>다녀온 여행 코스</b><br /><sub>초대 없이 바로 여행기 쓰기</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/diary-edit.webp" width="240" alt="여행기 쓰기" /><br /><b>여행기 쓰기</b><br /><sub>만족도 · 사진 · 경험 태그 · 이야기</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><img src="docs/images/screens/diary-photos.webp" width="240" alt="사진 첨부" /><br /><b>사진 첨부</b><br /><sub>카메라 · 앨범 · 최대 30장</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/diary-settings.webp" width="240" alt="여행기 설정" /><br /><b>여행기 설정</b><br /><sub>공개 범위 · 사진 위치 · 대표 사진 핀</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/diary-view.webp" width="240" alt="여행기 보기" /><br /><b>여행기 보기</b><br /><sub>대표 사진 · 태그 · 이야기</sub></td>
+  </tr>
 </table>
+
+<sub>여행기 예시 사진: 한국관광공사 (공공누리 제1유형)</sub>
 
 ## 주요 기능
 
@@ -97,7 +109,7 @@
 
 #### 일정 · 친구 초대
 
-달력에서 날짜를 정하고 초대 링크를 카카오톡 등으로 보냅니다. 받은 사람은 로그인 전에도 링크를 열 수 있고, 받은 초대는 홈의 벨에 모입니다. 친구를 초대했거나 혼자 가기로 했으면 첫 코스를 만든 뒤 **"여행 준비 완료"**로 준비를 마칩니다(코스는 그 뒤에도 계속 고칠 수 있습니다).
+달력에서 날짜를 정하고 초대 링크를 카카오톡 등으로 보냅니다. 이미 다녀온 여행은 **지난 날짜(최대 2년 전)**로 만들면 친구 초대를 건너뛰고 코스 · 여행기로 바로 이어집니다. 받은 사람은 로그인 전에도 링크를 열 수 있고, 받은 초대는 홈의 벨에 모입니다. 친구를 초대했거나 혼자 가기로 했으면 첫 코스를 만든 뒤 **"여행 준비 완료"**로 준비를 마칩니다(코스는 그 뒤에도 계속 고칠 수 있습니다).
 
 #### 함께 만드는 코스
 
@@ -120,8 +132,10 @@
 
 #### 여행기
 
-끝난 여행에 사진(최대 30장), 만족도, 경험 태그, 이야기를 남깁니다.
+끝난 여행에 사진(최대 30장), 만족도, 경험 태그, 이야기를 남깁니다. 끝난 여행의 코스 화면 · 저장 탭에서 "여행기 쓰기"로 들어가고, 코스를 만들지 않았어도 "코스 없이 바로 여행기 쓰기"로 쓸 수 있습니다.
 
+- 사진은 카메라나 앨범에서 고르고, 눌러서 대표 사진으로 정하거나 지웁니다. 큰 사진이 많으면 나눠서 차례로 올립니다.
+- 다 쓰기 전에는 임시저장(나만 보는 초안)으로 두고, 설정에서 발행합니다.
 - 공개 범위: 나만 / 친구 / 링크
 - 사진 촬영 위치를 다른 사람에게 보여 줄 정도: 지역만 / 정확히 / 숨김
 
