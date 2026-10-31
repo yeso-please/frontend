@@ -5,17 +5,16 @@ import Animated, { FadeIn, LinearTransition } from "react-native-reanimated";
 import { regionApi } from "@/api/endpoints";
 import { queryKeys } from "@/api/queryKeys";
 import { AppText } from "@/components/ui";
-import { useAuthStore } from "@/store/auth";
 import { colors, fonts, radius, space } from "@/theme";
 
 import { ShimmerBlock } from "../components/Shimmer";
 
 /**
- * B4 "우연으로 만나, 취향으로 가까워지는 곳" — 7-6 성향 맞춤 지역 문장. 앞에 "{닉네임}님은"을 붙이고(서버는 닉네임을 모름),
- * LLM 문장이면 "AI가 작성"을 표시합니다. 설문 v1·MBTI가 없으면 text가 null이라 영역을 숨깁니다.
+ * B4 "우연으로 만나, 취향으로 가까워지는 곳" — 7-6 성향 맞춤 지역 문장. 서버 문장(text)이 완결된 문장이라
+ * 앞에 아무것도 붙이지 않고 그대로 보여 줍니다. LLM 문장이면 "AI가 작성"을 표시합니다.
+ * 설문 v1·MBTI가 없으면 text가 null이라 영역을 숨깁니다.
  */
 export function MatchBox({ sigCd }: { sigCd: string }) {
-  const nickname = useAuthStore((s) => s.user?.nickname);
   const match = useQuery({ queryKey: queryKeys.regionMatch(sigCd), queryFn: () => regionApi.match(sigCd), staleTime: 10 * 60_000 });
 
   if (match.isError || (match.isSuccess && !match.data.text)) return null;
@@ -37,10 +36,7 @@ export function MatchBox({ sigCd }: { sigCd: string }) {
       </View>
       {data?.text ? (
         <Animated.View entering={FadeIn.duration(260)}>
-          <AppText variant="body" accessibilityLabel={`${nickname ?? ""}님은 ${data.text}`}>
-            {nickname ? `${nickname}님은 ` : ""}
-            {data.text}
-          </AppText>
+          <AppText variant="body">{data.text}</AppText>
         </Animated.View>
       ) : (
         <View style={styles.loading} accessibilityLabel="맞춤 문장을 쓰는 중이에요">
