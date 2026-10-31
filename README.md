@@ -47,7 +47,7 @@
 여행지를 정하는 데 시간을 다 쓰는 대신, **지도에 핀을 꽂아 우연히 고른 지역**으로 떠나 보는 앱입니다.
 
 1. 짧은 취향 설문으로 나의 **여행 성향**(16가지 캐릭터)을 알아봅니다.
-2. 지도에 핀을 꽂으면 무작위로, 또는 내 취향에 맞춰 **여행지가 뽑힙니다**.
+2. "핀 꽂기"를 꾹 눌렀다 놓으면 지도 위로 핀이 날아가, 무작위로 또는 내 취향에 맞춰 **여행지가 뽑힙니다**.
 3. 날짜를 정하고 친구를 초대하면, 모두의 취향을 반영한 **추천 코스**가 만들어지고 함께 고칩니다.
 4. 다녀온 뒤에는 사진과 이야기로 **여행기**를 남기고, 사진을 찍은 곳이 **나의 여행 지도**에 핀으로 쌓입니다.
 
@@ -57,18 +57,23 @@
 
 <table>
   <tr>
+    <td align="center" width="33%"><img src="docs/images/screens/start.webp" width="240" alt="시작화면" /><br /><b>시작화면</b><br /><sub>핀 · TriPin · 한 줄 소개</sub></td>
     <td align="center" width="33%"><img src="docs/images/screens/home.webp" width="240" alt="홈" /><br /><b>홈</b><br /><sub>준비 중인 여행 · 나의 여행 성향</sub></td>
-    <td align="center" width="33%"><img src="docs/images/screens/travel.webp" width="240" alt="핀 꽂기" /><br /><b>핀 꽂기</b><br /><sub>3D 지도에서 여행지 뽑기</sub></td>
-    <td align="center" width="33%"><img src="docs/images/screens/pin.webp" width="240" alt="뽑힌 지역" /><br /><b>뽑힌 지역</b><br /><sub>다시 뽑거나 알아보기</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/travel.webp" width="240" alt="핀 꽂기" /><br /><b>핀 꽂기</b><br /><sub>도 경계로 나뉜 3D 지도</sub></td>
   </tr>
   <tr>
+    <td align="center" width="33%"><img src="docs/images/screens/throw.webp" width="240" alt="핀 던지기" /><br /><b>핀 던지기</b><br /><sub>꾹 눌러 힘 모으기 → 떼면 날아가 꽂힘</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/pin.webp" width="240" alt="뽑힌 지역" /><br /><b>뽑힌 지역</b><br /><sub>시군구 경계 · 대표 사진</sub></td>
     <td align="center" width="33%"><img src="docs/images/screens/region.webp" width="240" alt="지역 추천" /><br /><b>지역 추천</b><br /><sub>대표 사진 · AI 맞춤 문장</sub></td>
-    <td align="center" width="33%"><img src="docs/images/screens/course.webp" width="240" alt="함께 만드는 코스" /><br /><b>함께 만드는 코스</b><br /><sub>일차별 장소 카드 · 순서 바꾸기</sub></td>
-    <td align="center" width="33%"><img src="docs/images/screens/course-map.webp" width="240" alt="코스 지도" /><br /><b>코스 지도</b><br /><sub>카카오맵 이동 경로</sub></td>
   </tr>
   <tr>
-    <td align="center" width="33%"><img src="docs/images/screens/place-info.webp" width="240" alt="관광지 정보" /><br /><b>관광지 정보</b><br /><sub>소개 · 이용 시간 · 쉬는 날</sub></td>
-    <td align="center" width="33%"><img src="docs/images/screens/my-courses.webp" width="240" alt="내 코스" /><br /><b>내 코스</b><br /><sub>짜는 중 · 완성 · 다녀옴</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/course.webp" width="240" alt="함께 만드는 코스" /><br /><b>함께 만드는 코스</b><br /><sub>장소 사진 줄 · 일차별 카드</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/place-info.webp" width="240" alt="관광지 상세" /><br /><b>관광지 상세</b><br /><sub>사진 · 소개 · 이용 시간 · 출처</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/meal.webp" width="240" alt="식당 고르기" /><br /><b>식당 고르기</b><br /><sub>추천 이유 · 끼니 빼기</sub></td>
+  </tr>
+  <tr>
+    <td align="center" width="33%"><img src="docs/images/screens/course-map.webp" width="240" alt="코스 지도" /><br /><b>코스 지도</b><br /><sub>카카오맵 이동 경로</sub></td>
+    <td align="center" width="33%"><img src="docs/images/screens/my-courses.webp" width="240" alt="내 코스" /><br /><b>내 코스</b><br /><sub>저장 탭 · 짜는 중 · 완성 · 다녀옴</sub></td>
     <td align="center" width="33%"><img src="docs/images/screens/persona.webp" width="240" alt="나의 여행 성향" /><br /><b>나의 여행 성향</b><br /><sub>16가지 여행 성향 캐릭터</sub></td>
   </tr>
 </table>
@@ -81,11 +86,17 @@
 
 #### 핀 꽂기로 여행지 발견
 
-3D 지형 지도는 도 경계로 나뉘어 있습니다. "핀 꽂기"를 꾹 누르면 지도가 위에서 아래로 출렁이며 힘이 모이고, 손을 떼면 핀이 다트처럼 날아가 지역이 뽑힙니다(완전 랜덤 / 내 취향). 핀이 꽂히면 그 시군구 경계가 그려집니다. 목록에서 직접 고를 수도 있습니다. 뽑힌 지역은 대표 사진, 맞춤 문장, "만나볼 순간"으로 소개합니다.
+지도에 다트를 던지는 랜덤 여행 영상에서 착안했습니다.
+
+- 3D 지형 지도는 실제 행정구역에 맞춘 **도 경계**로 나뉘어 있습니다.
+- "핀 꽂기"를 **꾹 누르면** 땅이 위에서 아래로 파도처럼 출렁이며 힘이 모이고, **손을 떼면** 핀이 다트처럼 날아가 지역이 뽑힙니다(완전 랜덤 / 내 취향). 짧게 누르면 안내만 합니다.
+- 핀이 꽂히면 충격이 퍼지고, 점선 원 대신 **그 시군구의 경계선**이 그려지며 지도가 다가옵니다. 아래 카드에 지역 대표 사진이 붙습니다.
+- 목록에서 직접 고를 수도 있습니다. 뽑힌 지역은 대표 사진, 맞춤 문장, "만나볼 순간"으로 소개합니다.
+- 뽑기 결과는 지역 상세·날짜 고르기에서 돌아오면 남고, 다른 탭으로 옮기거나 로그아웃하면 비웁니다.
 
 #### 일정 · 친구 초대
 
-달력에서 날짜를 정하고 초대 링크를 카카오톡 등으로 보냅니다. 받은 사람은 로그인 전에도 링크를 열 수 있고, 받은 초대는 홈의 벨에 모입니다.
+달력에서 날짜를 정하고 초대 링크를 카카오톡 등으로 보냅니다. 받은 사람은 로그인 전에도 링크를 열 수 있고, 받은 초대는 홈의 벨에 모입니다. 친구를 초대했거나 혼자 가기로 했으면 첫 코스를 만든 뒤 **"여행 준비 완료"**로 준비를 마칩니다(코스는 그 뒤에도 계속 고칠 수 있습니다).
 
 #### 함께 만드는 코스
 
@@ -141,6 +152,7 @@
 | OS | Android 7.0 (API 24) 이상 |
 | CPU | 64비트 ARM(arm64-v8a). 2017년 이후 나온 폰은 대부분 해당합니다. |
 | 네트워크 | 인터넷 연결 필요 (지도·코스·사진을 서버에서 받습니다) |
+| 권한 (선택) | 위치: 코스 첫 장소 거리를 볼 때만, 앱 사용 중에만 · 사진·카메라: 여행기 사진 |
 
 ### 업데이트
 
@@ -159,10 +171,10 @@
 | 프레임워크 | [Expo](https://docs.expo.dev/) SDK 57 (dev client, prebuild), React Native 0.86 (New Architecture), React 19, TypeScript |
 | 라우팅 | [expo-router](https://docs.expo.dev/router/introduction/): 파일 기반, typed routes, `Stack.Protected`로 로그인 분기 |
 | 서버 상태 | [TanStack Query](https://tanstack.com/query) v5 + 직접 만든 fetch 클라이언트(토큰 재발급 single-flight, 타임아웃) |
-| 앱 상태 | [zustand](https://github.com/pmndrs/zustand) (로그인, 여행 만들기 임시값, 로그인 전 초대 링크) |
+| 앱 상태 | [zustand](https://github.com/pmndrs/zustand) (로그인, 지역 뽑기 결과, 여행 만들기 임시값, 로그인 전 초대 링크) |
 | 애니메이션 · 제스처 | Reanimated 4, Gesture Handler, [@gorhom/bottom-sheet](https://github.com/gorhom/react-native-bottom-sheet) |
 | 목록 · 달력 | [FlashList](https://github.com/Shopify/flash-list) 2, [Flash Calendar](https://github.com/MarceloPrado/flash-calendar) |
-| 지도 | 카카오맵 JavaScript SDK (WebView), 직접 그린 3D 지형 지도 |
+| 지도 | 카카오맵 JavaScript SDK (WebView), 3D 지형 지도 + 그림에 맞춘 행정구역 조각(도 17 · 시군구 250, `scripts/korea-map`) |
 | 미디어 | expo-image, expo-image-picker, expo-file-system (사진 multipart 업로드) |
 | 위치 | expo-location (앱 사용 중 권한만, 코스 첫 장소 거리) |
 | 보안 저장 | expo-secure-store (refresh 토큰) |
@@ -301,7 +313,7 @@ npm run typecheck && npm run lint && npm test
 
 | 종류 | 도구 | 위치 | 확인하는 것 |
 |---|---|---|---|
-| 단위 | Jest | `tests/api`, `tests/features`, `tests/lib` | API 클라이언트 토큰 재발급, 목업 API 계약, 설문 값 변환, 코스 포맷·순서 변경, 지도 투영, 링크 상태, 장소 추가 |
+| 단위 | Jest | `tests/api`, `tests/features`, `tests/lib` | API 클라이언트 토큰 재발급, 목업 API 계약(식사 빼기·다시 넣기, 첫 장소 거리 포함), 설문 값 변환, 코스 포맷·순서 변경, 지도 투영·조각·시군구 외곽선, 첫 장소 거리 문구, 로그아웃 시 상태 비우기, 링크 상태, 장소 추가 |
 | 컴포넌트 | React Native Testing Library | `tests/components` | 버튼·태그·세그먼트, 여행기 본문, 여행 지도 핀, 보낸 링크 목록 |
 | 렌더 성능 | Reassure | `tests/perf` | 핀 30개 여행 지도, 사진 30장 여행기의 렌더 시간·횟수 |
 | E2E | Maestro | `.maestro/` | 하단 탭, 여행 지도 → 여행기, 친구 지도, 여행기 수정 ([설명](.maestro/README.md)) |
@@ -309,10 +321,10 @@ npm run typecheck && npm run lint && npm test
 
 ## 배포
 
-`main`에 앱 코드(`src/`, `assets/`, `app.json`, `package*.json`, 워크플로 파일)가 푸시되면 [`release-apk.yml`](.github/workflows/release-apk.yml)이 실행됩니다. 15분쯤 걸립니다.
+`main`에 앱 코드(`src/`, `assets/`, `app.json`, `package*.json`, 워크플로 파일)가 푸시되면 [`release-apk.yml`](.github/workflows/release-apk.yml)이 실행됩니다. 10~15분쯤 걸립니다.
 
 ```text
-테스트 → AWS 권한(OIDC) → SSM에서 카카오 키 읽기 → expo prebuild
+테스트 → AWS 권한(OIDC) → SSM에서 카카오 키 읽기 → versionCode = 1000 + 빌드 번호 → expo prebuild
   → gradlew assembleRelease (arm64-v8a) → S3 업로드 → CloudFront 캐시 비우기
 ```
 
@@ -344,6 +356,22 @@ ANDROID_ADB_SERVER_PORT=5038 adb devices
 ```
 
 Maestro는 5037 포트만 찾으므로, 이때는 5037 → 5038로 넘겨 주는 중계가 필요합니다.
+</details>
+
+<details>
+<summary><b>무선 디버깅을 다시 켰더니 연결이 거부돼요</b></summary>
+
+폰의 무선 디버깅을 껐다 켜면 PC와의 페어링이 풀릴 때가 있습니다. 폰 **무선 디버깅 → 페어링 코드로 기기 페어링** 팝업을 열고, 팝업의 IP:포트와 6자리 코드로 다시 페어링합니다(무선 디버깅 화면 위쪽의 연결용 포트와 다릅니다).
+
+```bash
+adb pair 172.30.1.17:<팝업 포트> <6자리 코드>
+```
+</details>
+
+<details>
+<summary><b>새 APK를 깔았는데 바뀐 그림이 안 보여요</b></summary>
+
+폰의 이미지 캐시는 리소스 번호 + versionCode로 그림을 구분합니다. 자동 빌드는 versionCode를 매번 올리므로 다운로드 페이지의 APK는 괜찮습니다. 직접 만든 빌드라면 `app.json`의 `android.versionCode`를 올려서 빌드합니다.
 </details>
 
 <details>
@@ -381,7 +409,7 @@ Maestro는 5037 포트만 찾으므로, 이때는 5037 → 5038로 넘겨 주는
 - **원격 이미지**: 항상 `secureImageUrl()`을 거칩니다. 관광공사 이미지가 `http://`로 오기 때문입니다.
 - **코드 스타일**: 쌍따옴표, 세미콜론, camelCase.
 - **커밋**: `feat: …`, `fix: …`, `docs: …` 형식으로 쓰고, 한 커밋에는 한 가지 변경만 담습니다.
-- **디자인 기준**: 피그마 `IvlST03u2P3Un9OTjUSyBk`의 "초안" 섹션이 1순위입니다.
+- **디자인 기준**: 피그마 `IvlST03u2P3Un9OTjUSyBk`의 "초안" 섹션이 1순위입니다. 하단 탭·내 코스·여행기는 "추가 화면" 수정본(2026-10-29), 앱 시작은 "시작화면" 섹션을 따릅니다.
 
 ## 관련 저장소
 
