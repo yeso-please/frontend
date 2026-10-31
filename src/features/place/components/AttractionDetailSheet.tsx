@@ -3,11 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Image } from "expo-image";
 import type { RefObject } from "react";
 import { useState } from "react";
-import { ActivityIndicator, Linking, StyleSheet, View } from "react-native";
+import { ActivityIndicator, FlatList, Linking, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { attractionApi } from "@/api/endpoints";
-import { errorMessage } from "@/api/errors";
+import { errorMessage, isApiError } from "@/api/errors";
 import { queryKeys } from "@/api/queryKeys";
 import type { AttractionDetail } from "@/api/types";
 import { AppText, Button, PressableScale } from "@/components/ui";
@@ -29,8 +29,13 @@ const NOT_RECOMMENDABLE: Record<AttractionDetail["notRecommendableReasons"][numb
 
 type Props = { sheetRef: RefObject<BottomSheetModal | null>; attractionId: number | null };
 
+/** 관광지 상세 7-4 (회원 전용). 시트·코스 카드·장소 편집 요약이 같은 캐시를 씁니다. */
+export function useAttractionDetail(attractionId: number) {
+  return useQuery({ queryKey: queryKeys.attraction(attractionId), queryFn: () => attractionApi.detail(attractionId), staleTime: 10 * 60_000 });
+}
+
 /**
- * 관광지 상세 (7-4) — 장소 편집에서 지금 장소·후보를 눌러 봅니다.
+ * 관광지 상세 (7-4) — 코스 카드의 "상세보기", 장소 편집·추가에서 엽니다. 공유·비회원 화면에서는 열지 않습니다(회원 전용 API).
  * 설명은 원천(한국관광공사) 글 그대로이고, 한 줄 소개는 사람이 승인한 것만 옵니다.
  */
 export function AttractionDetailSheet({ sheetRef, attractionId }: Props) {
@@ -46,23 +51,22 @@ export function AttractionDetailSheet({ sheetRef, attractionId }: Props) {
 }
 
 function DetailContent({ attractionId }: { attractionId: number }) {
-  const detail = useQuery({ queryKey: queryKeys.attraction(attractionId), queryFn: () => attractionApi.detail(attractionId), staleTime: 10 * 60_000 });
+  const detail = useAttractionDetail(attractionId);
   const [expanded, setExpanded] = useState(false);
 
   if (detail.isPending) return <ActivityIndicator color={colors.green} style={styles.loading} />;
   if (detail.isError) {
     return (
       <AppText variant="small13" color="muted">
-        {errorMessage(detail.error)}
+        {/* 없는 관광지·음식점·숙박 등은 404 */}
+        {isApiError(detail.error, "ATTRACTION_NOT_FOUND") ? "정보를 불러오지 못했어요" : errorMessage(detail.error)}
       </AppText>
     );
   }
 
   const a = detail.data;
-  const image = a.images[0];
-  const imageUrl = secureImageUrl(image?.url);
   const minutes = a.estimatedDurationMinutes;
-  const stay = `머무는 시간 ${minutes >= 60 ? `약 ${Math.floor(minutes / 60)}시간${minutes % 60 ? ` ${minutes % 60}분` : ""}` : `약 ${minutes}분`}${a.estimated ? " (추정)" : ""}`;
+  const stay = `머무는 시간 ${minutes >= 60 ? `약 ${Math.floor(minutes / 60)}시간${minutes % 60 ? ` ${minutes % 60}분` : ""}` : `약 ${minutes}분`}${a.estimated ? " (참고값)" : ""}`;
   const info: [string, string | null][] = [
     ["주소", a.address],
     ["이용 시간", a.useTime],
@@ -71,16 +75,7 @@ function DetailContent({ attractionId }: { attractionId: number }) {
 
   return (
     <View style={styles.body}>
-      {imageUrl ? (
-        <View>
-          <Image source={{ uri: imageUrl }} style={styles.image} contentFit="cover" transition={200} accessibilityLabel={`${a.name} 사진`} />
-          {image?.sourceName ? (
-            <AppText variant="badge" color="muted" style={styles.caption}>
-              {`사진: ${image.sourceName}`}
-            </AppText>
-          ) : null}
-        </View>
-      ) : null}
+      <Photos images={a.images} name={a.name} />
 
       <View style={styles.titleBlock}>
         <AppText variant="cardTitle" accessibilityRole="header">
@@ -161,6 +156,52 @@ function DetailContent({ attractionId }: { attractionId: number }) {
   );
 }
 
+/** 사진 여러 장을 옆으로 넘겨 봅니다. 사진마다 출처(공공누리 등)를 작게 붙입니다. */
+function Photos({ images, name }: { images: AttractionDetail["images"]; name: string }) {
+  const [width, setWidth] = useState(0);
+  const [page, setPage] = useState(0);
+  const shown = images.filter((img) => !!secureImageUrl(img.url));
+  if (shown.length === 0) return null;
+  const credit = (img: AttractionDetail["images"][number]) => [img.sourceName, img.license].filter(Boolean).join(" · ");
+  return (
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
+      {width > 0 ? (
+        <FlatList
+          data={shown}
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          keyExtractor={(img, i) => `${img.url}-${i}`}
+          onMomentumScrollEnd={(e) => setPage(Math.round(e.nativeEvent.contentOffset.x / width))}
+          renderItem={({ item, index }) => (
+            <View style={{ width }}>
+              <Image
+                source={{ uri: secureImageUrl(item.url) ?? undefined }}
+                style={styles.image}
+                contentFit="cover"
+                transition={200}
+                accessibilityLabel={`${name} 사진 ${index + 1}/${shown.length}`}
+              />
+            </View>
+          )}
+        />
+      ) : (
+        <View style={styles.image} />
+      )}
+      <View style={styles.captionRow}>
+        <AppText variant="badge" color="muted" style={styles.flex} numberOfLines={1}>
+          {credit(shown[Math.min(page, shown.length - 1)]) ? `사진: ${credit(shown[Math.min(page, shown.length - 1)])}` : ""}
+        </AppText>
+        {shown.length > 1 ? (
+          <AppText variant="badge" color="muted">
+            {`${Math.min(page, shown.length - 1) + 1} / ${shown.length}`}
+          </AppText>
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   handle: { width: 38, height: 4, backgroundColor: "#D7DDD9" },
@@ -169,7 +210,7 @@ const styles = StyleSheet.create({
   loading: { marginVertical: space[32] },
   body: { gap: space[16] },
   image: { width: "100%", aspectRatio: 16 / 10, borderRadius: radius.lg, backgroundColor: colors.surface },
-  caption: { marginTop: space[4] },
+  captionRow: { flexDirection: "row", gap: space[8], marginTop: space[4] },
   titleBlock: { gap: space[4] },
   oneLine: { marginTop: space[4] },
   tags: { flexDirection: "row", flexWrap: "wrap", gap: space[4], marginTop: space[4] },

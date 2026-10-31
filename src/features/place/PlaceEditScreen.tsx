@@ -19,6 +19,7 @@ import { haptics } from "@/lib/haptics";
 import { withEulReul, withEuro } from "@/lib/josa";
 import { colors, motion, radius, screenPadding, space } from "@/theme";
 
+import { AttractionBlurb } from "./components/AttractionBlurb";
 import { AttractionDetailSheet } from "./components/AttractionDetailSheet";
 import { CandidateRow } from "./components/CandidateRow";
 import { CurrentPlaceCard } from "./components/CurrentPlaceCard";
@@ -183,6 +184,7 @@ export function PlaceEditScreen({ tripId, itemId }: { tripId: number; itemId: st
               현재 장소
             </AppText>
             <CurrentPlaceCard item={current} dayIndex={found.dayIndex} />
+            <AttractionBlurb attractionId={current.attractionId} onMore={() => openDetail(current.attractionId)} />
             <PressableScale onPress={() => openDetail(current.attractionId)} haptic="tick" hitSlop={8} style={styles.detailLink} accessibilityRole="button" accessibilityLabel={`${current.name} 장소 정보 보기`}>
               <AppText variant="small13Medium" color="darkgreen">
                 장소 정보 보기 ›
@@ -280,6 +282,8 @@ export function PlaceEditScreen({ tripId, itemId }: { tripId: number; itemId: st
                   {selected.reason}
                 </AppText>
               ) : null}
+              {/* 추천 이유 → 한 줄 소개 → 설명 앞부분 (요청서 #3) */}
+              <AttractionBlurb attractionId={selected.attractionId} onMore={() => openDetail(selected.attractionId)} />
               <AppText variant="small12" color="muted">{`지금 장소 · ${current.name}`}</AppText>
               <PressableScale onPress={() => openDetail(selected.attractionId)} haptic="tick" hitSlop={8} style={styles.detailLink} accessibilityRole="button" accessibilityLabel={`${selected.name} 장소 정보 보기`}>
                 <AppText variant="small13Medium" color="darkgreen">

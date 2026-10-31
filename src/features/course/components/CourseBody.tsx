@@ -8,6 +8,7 @@ import { colors, motion, radius, space } from "@/theme";
 
 import { dayChangeSummary, latestChangeSentence } from "../format";
 import { MealCard, PlaceCard, RemovedCard } from "./CourseCards";
+import { CoursePhotoStrip } from "./CoursePhotoStrip";
 import { DayTabs } from "./DayTabs";
 import { type DragScroll, DraggableList, ROW_GAP } from "./DraggableList";
 import { SegmentedTabs } from "./SegmentedTabs";
@@ -37,12 +38,14 @@ type Props = {
     /** 그 날 코스에 새 장소 넣기 (지도 관광지 핀 7-3 → 5-3 ADD) */
     onAddPlace?: (dayIndex: number) => void;
   };
+  /** 관광지 상세 시트 열기 (7-4는 회원 전용이라 공유·비회원 화면에서는 넘기지 않습니다) */
+  onOpenDetail?: (attractionId: number) => void;
   /** 목록 아래 덧붙일 내용 (예: 코스 다시 만들기) */
   footer?: ReactNode;
 };
 
 /** 함께 만드는 코스 본문 — 취향 상자 · 전체 보기/변경 표시 · 일차 탭 · 상태 줄 · 카드 목록 (E1·E2·E4·E5~E8) */
-export function CourseBody({ course, transport, tab, onTabChange, dayIndex, onDayChange, statusOverride, edit, footer }: Props) {
+export function CourseBody({ course, transport, tab, onTabChange, dayIndex, onDayChange, statusOverride, edit, onOpenDetail, footer }: Props) {
   const day = course.days.find((d) => d.dayIndex === dayIndex) ?? course.days[0];
   const dayChanges = course.changes?.days.find((d) => d.dayIndex === day?.dayIndex);
   const removed = (course.changes?.removed ?? []).filter((r) => r.dayIndex === day?.dayIndex);
@@ -56,13 +59,20 @@ export function CourseBody({ course, transport, tab, onTabChange, dayIndex, onDa
 
   const renderItem = (item: CourseItem, handle: ReactNode | undefined) =>
     item.type === "ATTRACTION" ? (
-      <PlaceCard item={item} transport={transport} handle={handle} onEdit={edit ? () => edit.onEditPlace(item.itemId) : undefined} />
+      <PlaceCard
+        item={item}
+        transport={transport}
+        handle={handle}
+        onEdit={edit ? () => edit.onEditPlace(item.itemId) : undefined}
+        onDetail={onOpenDetail ? () => onOpenDetail(item.attractionId) : undefined}
+      />
     ) : (
       <MealCard item={item} transport={transport} handle={handle} onPick={edit ? () => edit.onPickMeal(item.itemId) : undefined} />
     );
 
   return (
     <View style={styles.wrap}>
+      <CoursePhotoStrip course={course} onOpen={onOpenDetail} />
       <TasteBasisBox course={course} />
 
       <SegmentedTabs

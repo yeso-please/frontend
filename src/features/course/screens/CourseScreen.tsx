@@ -11,6 +11,7 @@ import { errorMessage, isApiError } from "@/api/errors";
 import { queryKeys } from "@/api/queryKeys";
 import { Icons } from "@/components/icons";
 import { AppText, BottomCTA, Button, EmptyView, ErrorView, LoadingView, PressableScale, Screen, TopBar } from "@/components/ui";
+import { AttractionDetailSheet } from "@/features/place/components/AttractionDetailSheet";
 import { CourseShareSheet } from "@/features/share/CourseShareSheet";
 import { diffDays } from "@/lib/date";
 import { haptics } from "@/lib/haptics";
@@ -159,6 +160,13 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
   const goBack = () => (router.canGoBack() ? router.back() : router.replace("/(tabs)"));
   const openParticipants = () => router.push({ pathname: "/trip/[tripId]/participants", params: { tripId: String(tripId) } });
   const shareRef = useRef<BottomSheetModal>(null);
+  // 관광지 상세 (7-4): 코스 카드의 "상세보기"·사진 줄에서 엽니다.
+  const detailRef = useRef<BottomSheetModal>(null);
+  const [detailId, setDetailId] = useState<number | null>(null);
+  const openDetail = (attractionId: number) => {
+    setDetailId(attractionId);
+    detailRef.current?.present();
+  };
 
   // ── 상태별 화면 ──
   /** 하단 버튼으로 탭을 바꾸면 변경 요약이 보이도록 맨 위로 올립니다 (E1 → E2) */
@@ -288,6 +296,7 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
             dayIndex={dayIndex}
             onDayChange={setDayIndex}
             statusOverride={generate.isPending ? "새 코스를 만드는 중이에요…" : status}
+            onOpenDetail={openDetail}
             edit={
               data.myRole === "PARTICIPANT"
                 ? {
@@ -341,6 +350,7 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
         onConfirm={() => runGenerate(true)}
       />
       <CourseShareSheet sheetRef={shareRef} tripId={tripId} title={title} />
+      <AttractionDetailSheet sheetRef={detailRef} attractionId={detailId} />
     </Screen>
   );
 }

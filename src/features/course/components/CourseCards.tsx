@@ -28,7 +28,7 @@ function Thumb({ url, kind, muted }: { url: string | null; kind: AttractionItem[
 
 function EditButton({ label, onPress }: { label: string; onPress: () => void }) {
   return (
-    <PressableScale onPress={onPress} style={styles.editButton} accessibilityRole="button" accessibilityLabel={label}>
+    <PressableScale onPress={onPress} style={[styles.editButton, styles.flex]} accessibilityRole="button" accessibilityLabel={label}>
       <AppText variant="small13Medium" color="blue">
         {`${label} ›`}
       </AppText>
@@ -42,12 +42,14 @@ type PlaceCardProps = {
   transport: Transport;
   /** 편집 가능한 참여자 화면이면 "장소 편집" 버튼을 보여 줍니다 */
   onEdit?: () => void;
+  /** 회원 화면이면 "상세보기"(7-4 시트). 공유·비회원 화면에는 없습니다 */
+  onDetail?: () => void;
   /** 드래그 핸들(편집 화면에서만) */
   handle?: ReactNode;
 };
 
-/** 코스 관광지 카드 (초안 E1: 라벨 · 썸네일 · 이름 · 이동 시간 · 한 줄 소개 · 장소 편집) */
-export function PlaceCard({ item, transport, onEdit, handle }: PlaceCardProps) {
+/** 코스 관광지 카드 (초안 E1: 라벨 · 썸네일 · 이름 · 이동 시간 · 한 줄 소개 · 상세보기 · 장소 편집) */
+export function PlaceCard({ item, transport, onEdit, onDetail, handle }: PlaceCardProps) {
   const label = changeLabel(item);
   const replaced = replacedLine(item);
   const description = itemDescription(item);
@@ -57,9 +59,15 @@ export function PlaceCard({ item, transport, onEdit, handle }: PlaceCardProps) {
         {label.text}
       </AppText>
       <View style={styles.main}>
-        <Thumb url={item.thumbnailUrl} kind={item.category} />
+        {onDetail ? (
+          <PressableScale onPress={onDetail} haptic="tick" scaleTo={0.96} accessibilityRole="button" accessibilityLabel={`${item.name} 상세보기`}>
+            <Thumb url={item.thumbnailUrl} kind={item.category} />
+          </PressableScale>
+        ) : (
+          <Thumb url={item.thumbnailUrl} kind={item.category} />
+        )}
         <View style={styles.texts}>
-          <AppText variant="cardTitle" numberOfLines={2}>
+          <AppText variant="cardTitle" numberOfLines={2} onPress={onDetail} suppressHighlighting>
             {item.name}
           </AppText>
           <TravelTimes leg={item.travelFromPrevious} primary={transport} />
@@ -81,7 +89,12 @@ export function PlaceCard({ item, transport, onEdit, handle }: PlaceCardProps) {
           {CATEGORY_LABEL[item.category]}
         </AppText>
       )}
-      {onEdit ? <EditButton label="장소 편집" onPress={onEdit} /> : null}
+      {onDetail || onEdit ? (
+        <View style={styles.actions}>
+          {onDetail ? <EditButton label="상세보기" onPress={onDetail} /> : null}
+          {onEdit ? <EditButton label="장소 편집" onPress={onEdit} /> : null}
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -120,7 +133,11 @@ export function MealCard({ item, transport, onPick, handle }: MealCardProps) {
       {restaurant?.representativeMenu ? (
         <AppText variant="small13" color="charcoal">{`대표 메뉴 · ${restaurant.representativeMenu}`}</AppText>
       ) : null}
-      {onPick ? <EditButton label={restaurant ? "식당 바꾸기" : "식당 고르기"} onPress={onPick} /> : null}
+      {onPick ? (
+        <View style={styles.actions}>
+          <EditButton label={restaurant ? "식당 바꾸기" : "식당 고르기"} onPress={onPick} />
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -190,7 +207,9 @@ const styles = StyleSheet.create({
   thumbMuted: { backgroundColor: colors.border },
   thumbImage: { width: THUMB, height: THUMB },
   imageMuted: { opacity: 0.5 },
-  editButton: { height: 44, borderRadius: radius.md, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center", marginTop: space[4] },
+  flex: { flex: 1 },
+  actions: { flexDirection: "row", gap: space[8], marginTop: space[4] },
+  editButton: { height: 44, borderRadius: radius.md, backgroundColor: colors.surface, alignItems: "center", justifyContent: "center" },
   removedChip: { alignSelf: "flex-start", paddingHorizontal: space[8], paddingVertical: 2, borderRadius: radius.sm, backgroundColor: colors.border },
   restore: { alignSelf: "center", paddingHorizontal: space[16], height: 36, justifyContent: "center" },
 });
