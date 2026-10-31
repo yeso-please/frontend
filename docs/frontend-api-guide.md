@@ -90,7 +90,8 @@
 | **C. 여행 만들기** | `GET /trips/unavailable-dates` (캘린더 비활성) → `POST /trips/context/check` (겹침·가능 지역 수 확인) → `POST /trips` |
 | **D. 지역 정하기** | `GET /regions?days=&scheduleDensity=` (전국 지도) → `POST /trips/{id}/region` → `GET /regions/{sigCd}/card` (지역 소개 카드) |
 | **E. 코스 만들기** | `POST /courses/{id}/generate` → 지도 `GET /regions/{sigCd}/attractions` · 상세 `GET /attractions/{id}` → 교체 후보 `GET /courses/{id}/alternatives` → 편집 `PATCH /courses/{id}/schedule` |
-| **F. 식당 고르기** | `GET /courses/{id}/restaurants/recommendations` (비어 있으면) → `GET /courses/{id}/restaurants/search` → `PATCH /courses/{id}/schedule` (`SET_RESTAURANT`) |
+| **F. 식당 고르기** | `GET /courses/{id}/restaurants/recommendations` (비어 있으면) → `GET /courses/{id}/restaurants/search` → `PATCH /courses/{id}/schedule` (`SET_RESTAURANT`) · 끼니 빼기 `REMOVE`(식사) · 다시 넣기 `ADD_MEAL` |
+| **F2. 첫 장소 거리** | 코스 화면 "지금 위치에서 거리 보기" → (위치 권한 허용) → `GET /courses/{id}/first-leg?dayIndex=&lat=&lng=` |
 | **G. 같이 갈 사람 초대** | 링크: `POST /trips/{id}/invites` → (받은 사람) `GET /invites/{token}` → 로그인·온보딩 → `POST /invites/{token}/accept` |
 | | 친구 직접: `POST /trips/{id}/friend-invites` → (받은 사람) `GET /me/trip-invites` → `POST /me/trip-invites/{id}/accept` |
 | **H. 코스 공유(읽기 전용)** | `POST /courses/{id}/share-links` → (받은 사람) `GET /shared/courses/{token}` → 자동으로 코스 JSON 수신 |
@@ -187,10 +188,11 @@
 |---|---|---|---|
 | POST | `/courses/{tripId}/generate` | 참여자 | 코스 생성·재생성 |
 | GET | `/courses/{tripId}` | 참여자 | 코스 조회 |
-| PATCH | `/courses/{tripId}/schedule` | 참여자 | 일정 편집 (추가·교체·삭제·이동·식당) |
+| PATCH | `/courses/{tripId}/schedule` | 참여자 | 일정 편집 (추가·교체·삭제·이동·식당·끼니 빼기/넣기) |
 | GET | `/courses/{tripId}/alternatives` | 참여자 | 대체·추가 후보 관광지 |
 | GET | `/courses/{tripId}/restaurants/recommendations` | 참여자 | 식당 추천 |
 | GET | `/courses/{tripId}/restaurants/search` | 참여자 | 카카오 식당 검색 |
+| GET | `/courses/{tripId}/first-leg` | 참여자 | 지금 위치 → 그날 첫 관광지 거리·시간 (5-8) |
 
 ### 지역·관광지
 
@@ -874,7 +876,8 @@ history.replaceState(null, '', '/shared'); // 주소창에서 token 지우기
     {"op": "MOVE", "itemId": "a-104", "dayIndex": 0, "position": 1},
     {"op": "REMOVE", "itemId": "a-105"},
     {"op": "SET_RESTAURANT", "itemId": "m-31", "selectionToken": "rs_eyJ..."},
-    {"op": "CLEAR_RESTAURANT", "itemId": "m-32"}
+    {"op": "CLEAR_RESTAURANT", "itemId": "m-32"},
+    {"op": "ADD_MEAL", "dayIndex": 0, "meal": "LUNCH", "position": 3}
   ]
 }
 ```
@@ -883,10 +886,11 @@ history.replaceState(null, '', '/shared'); // 주소창에서 token 지우기
 |---|---|---|---|
 | `ADD` | `dayIndex`, `position?`, `attractionId` | — | 관광지 추가. `position`은 그날 목록(식사 포함)의 위치(0부터), 생략하면 맨 뒤 |
 | `REPLACE` | `itemId`, `attractionId` | 관광지 | 다른 관광지로 교체 (`itemId` 유지) |
-| `REMOVE` | `itemId` | 관광지 | 삭제. **식사는 삭제 불가** |
+| `REMOVE` | `itemId`, `note?` | 관광지·식사 | 관광지는 빼고 제외 기록(`changes.removed`)에 남깁니다. **식사(`m-…`)는 칸과 고른 식당을 함께 지우고 기록에 남기지 않으며, `note`를 보내면 400** |
 | `MOVE` | `itemId`, `dayIndex`, `position` | 관광지·식사 | 순서 변경 (드래그 앤 드롭). 관광지는 다른 날로도, **식사는 같은 날 안에서만** |
 | `SET_RESTAURANT` | `itemId`, `selectionToken` | 식사 | 식당 지정. 추천·검색 결과의 `selectionToken`을 그대로 |
-| `CLEAR_RESTAURANT` | `itemId` | 식사 | 식당 선택 해제 |
+| `CLEAR_RESTAURANT` | `itemId` | 식사 | 식당 선택 해제 (식사 칸은 남고 "미정") |
+| `ADD_MEAL` | `dayIndex`, `meal`(`LUNCH`\|`DINNER`), `position?` | — | 뺀 끼니 다시 넣기. 날마다 끼니별 하나. `position` 생략 = 맨 뒤, 새 `itemId`, 식당 미정. 어느 끼니가 빠졌는지는 그날 항목의 `meal`로 판단 |
 
 - 응답 `200` 갱신된 `Course` (`version` +1). 응답으로 화면을 통째로 다시 그리면 됩니다
 - 개수 제한 없음 (밀도보다 많이 넣어도 됨), 관광지 0곳인 날도 허용
@@ -894,7 +898,7 @@ history.replaceState(null, '', '/shared'); // 주소창에서 token 지우기
 
 | 오류 | 의미 |
 |---|---|
-| `400 COURSE_INVALID_OPERATION` | 잘못된 작업 (식사 삭제, 식사를 다른 날로 이동 등) |
+| `400 COURSE_INVALID_OPERATION` | 잘못된 작업 (식사 삭제에 `note`, 이미 있는 끼니 `ADD_MEAL`, 식사를 다른 날로 이동 등) |
 | `404 COURSE_ITEM_NOT_FOUND` / `ATTRACTION_NOT_FOUND` | 없는 항목·관광지 |
 | `409 TRIP_VERSION_CONFLICT` | 다른 사람이 먼저 수정 → `GET /courses/{tripId}`로 다시 받고 재시도 |
 | `409 ATTRACTION_ALREADY_IN_COURSE` | 이미 일정에 있는 장소 |
@@ -955,7 +959,8 @@ GET /api/courses/{tripId}/restaurants/recommendations?itemId=m-31&radius=5000
   "regionFoodThemes": [{"name": "경주 찰보리빵", "sources": [{"name": "경주시청", "url": "https://…"}]}],
   "sections": [
     {"source": "TOUR_API", "label": "한국관광공사 등록 음식점", "items": [
-      {"selectionToken": "rs_eyJ...", "distanceMeters": 420, "name": "황남맷돌순두부", "...": "RestaurantSnapshot 필드들"}
+      {"selectionToken": "rs_eyJ...", "distanceMeters": 420, "name": "황남맷돌순두부",
+       "reasons": ["다음 장소 가는 길이에요 · 200m만 돌아가요", "점심(한식)과 다른 일식이에요"], "...": "RestaurantSnapshot 필드들"}
     ]},
     {"source": "FARM_RESTAURANT", "label": "농촌진흥청 농가맛집", "items": []},
     {"source": "MODEL_RESTAURANT", "label": "지자체 모범·향토음식점", "items": []},
@@ -965,11 +970,36 @@ GET /api/courses/{tripId}/restaurants/recommendations?itemId=m-31&radius=5000
 ```
 
 - 기준점(`origin`)은 식사 바로 앞 관광지, 없으면 지역 중심 (`origin.type`: `PREVIOUS_ATTRACTION` \| `REGION_CENTER`)
-- `sections` 순서가 우선순위. 섹션별 거리순 최대 20개. **MVP에서는 `TOUR_API` 섹션만 채워지고** 나머지는 빈 배열
+- `sections` 순서가 우선순위. 섹션별 최대 20개, **"동선에서 덜 돌아가는 곳 + 사진 있는 곳 + 같은 날 다른 식사와 다른 종류" 점수순**이라 앱에서 다시 정렬하지 않습니다. **MVP에서는 `TOUR_API` 섹션만 채워지고** 나머지는 빈 배열
+- `reasons`(최대 2개)는 식당 이름 아래 회색 문장으로 보여 줍니다. 빈 배열이면 표시하지 않습니다. 카카오 검색 결과에는 없습니다
+- 카페·전통찻집은 식사 후보가 없을 때만 나옵니다
 - `regionFoodThemes`가 빈 배열이면 영역을 숨겨 주세요
 - **모든 섹션이 비어 있으면 같은 `itemId`로 카카오 검색(아래)을 자동 호출**해서 보여주세요
 - 식당을 고르면 `PATCH /schedule`에 `{"op": "SET_RESTAURANT", "itemId": "m-31", "selectionToken": "rs_..."}`
 - ⚠️ `selectionToken`: 해석하지 말고 그대로 body에 넣습니다 (URL query에 넣지 말 것). **30분 후 만료**되고 그 슬롯에서만 쓸 수 있습니다
+
+### GET `/courses/{tripId}/first-leg` — 지금 위치에서 첫 장소까지 (5-8)
+
+```
+GET /api/courses/{tripId}/first-leg?dayIndex=0&lat=37.5665&lng=126.978
+```
+
+| Query | 필수 | 설명 |
+|---|---|---|
+| `lat`, `lng` | O | 기기 현재 위치. 위도 33~39, 경도 124~132 밖이면 400 |
+| `dayIndex` | | 기본 0 |
+
+```json
+{"tripId": 42, "dayIndex": 0, "itemId": "a-101", "attractionId": 5012, "name": "대릉원", "lat": 35.838, "lng": 129.211,
+ "straightMeters": 2400,
+ "car":     {"source": "ROAD",    "distanceMeters": 3100, "durationMinutes": 9,  "transfers": null, "fare": null},
+ "walk":    {"source": "WALK",    "distanceMeters": 2700, "durationMinutes": 38, "transfers": null, "fare": null},
+ "transit": {"source": "TRANSIT", "distanceMeters": 2900, "durationMinutes": 21, "transfers": 0,    "fare": 1500}}
+```
+
+- 대상은 그날 첫 **관광지**(식사 제외). `source`가 `STRAIGHT`면 경로를 못 구해 직선으로 추정한 값입니다("약 N분(직선 추정)"). `walk`는 직선 10km 초과면 `null`
+- 앱은 "앱 사용 중" 위치 권한만, 버튼을 누를 때 묻습니다. 좌표는 query로만 보내고 저장·표시하지 않습니다. 100m 안에서 다시 부르면 서버가 기억한 결과(24시간)를 줍니다
+- 오류: `400 COMMON_INVALID_REQUEST`(국내 밖 좌표·`dayIndex` 범위 밖·그날 관광지 없음), `404 TRIP_NOT_FOUND`, `404 COURSE_NOT_FOUND`
 
 ### GET `/courses/{tripId}/restaurants/search` — 카카오 식당 검색
 
