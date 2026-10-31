@@ -185,7 +185,8 @@ const styles = StyleSheet.create({
   photo: { width: PHOTO, height: PHOTO, borderRadius: radius.md, backgroundColor: colors.surface },
   credit: { fontSize: 9, lineHeight: 12 },
   summary: { gap: space[8], marginTop: 2 },
-  tags: { flexDirection: "row", gap: space[8], height: 28, overflow: "hidden" },
+  // 사진 옆이라 폭이 좁으면 안 들어가는 태그는 다음 줄로 넘겨 숨깁니다 (반쯤 잘려 보이지 않게)
+  tags: { flexDirection: "row", flexWrap: "wrap", gap: space[8], height: 28, overflow: "hidden" },
   noteRow: { minHeight: 28, flexDirection: "row", alignItems: "center", gap: space[8] },
   footer: { position: "absolute", left: screenPadding, right: screenPadding, bottom: space[16], gap: space[12] },
   actions: { flexDirection: "row", gap: space[8] },
