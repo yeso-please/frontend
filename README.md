@@ -33,6 +33,7 @@
 - [주요 기능](#주요-기능)
 - [앱 설치하기](#앱-설치하기)
 - [기술 스택](#기술-스택)
+- [아키텍처](#아키텍처)
 - [개발 시작하기](#개발-시작하기)
 - [스크립트](#스크립트)
 - [프로젝트 구조](#프로젝트-구조)
@@ -177,10 +178,54 @@
 | 지도 | 카카오맵 JavaScript SDK (WebView), 3D 지형 지도 + 그림에 맞춘 행정구역 조각(도 17 · 시군구 250, `scripts/korea-map`) |
 | 미디어 | expo-image, expo-image-picker, expo-file-system (사진 multipart 업로드) |
 | 위치 | expo-location (앱 사용 중 권한만, 코스 첫 장소 거리) |
-| 보안 저장 | expo-secure-store (refresh 토큰) |
+| 인증 | access token은 메모리, refresh token은 서버가 주는 HttpOnly 쿠키(Android CookieManager) |
 | 기타 | react-native-svg(+ svg transformer), sonner-native(토스트), expo-haptics, expo-linear-gradient |
 | 테스트 | Jest(jest-expo), [React Native Testing Library](https://github.com/callstack/react-native-testing-library), [Reassure](https://github.com/callstack/reassure), [Maestro](https://github.com/mobile-dev-inc/Maestro), [Flashlight](https://github.com/bamlab/flashlight) |
 | CI/CD | GitHub Actions → AWS(OIDC) → S3 + CloudFront |
+
+## 아키텍처
+
+<p align="center">
+  <img src="docs/images/architecture.svg" alt="TriPin 아키텍처: 안드로이드 앱이 CloudFront를 거쳐 AWS의 Spring Boot 백엔드·AI 서버와 S3 정적 사이트에 연결되고, 백엔드는 RDS·S3·SSM과 카카오·TourAPI·Gemini를 씁니다" width="100%" />
+</p>
+
+### 요청이 가는 길
+
+1. 앱은 모든 서버 요청을 **HTTPS로 CloudFront**(`dn77qbtivmjzt.cloudfront.net`)에 보냅니다.
+2. CloudFront는 경로로 나눕니다.
+   - `/api/*`: 캐시 없이 쿠키·헤더를 그대로 붙여 **EC2의 Spring Boot 백엔드**(:8080)로 보냅니다. EC2는 CloudFront 대역에서 오는 요청만 받습니다.
+   - 그 밖의 경로: **S3 정적 사이트**에서 공유 코스·여행기 웹페이지, 초대 안내, 앱 링크 파일(`assetlinks.json`), APK 다운로드를 내려 줍니다.
+3. 백엔드는 같은 EC2 안의 **AI 서버**(`127.0.0.1:8000`, 밖에서 못 들어옴)와 개발 **RDS PostgreSQL**을 씁니다.
+   - AI 서버: 취향 임베딩, 코스·지역 소개 문장
+   - RDS: 팀 공용 개발 DB, Flyway로 스키마 관리
+   - 그 밖에 S3(여행기 사진·순위 모델)와 SSM Parameter Store(비밀값·설정)를 씁니다.
+
+### 인증
+
+- 로그인하면 **access token(JWT)은 앱 메모리**에만 두고, **refresh token은 서버가 HttpOnly 쿠키**로 줍니다. 안드로이드 CookieManager가 보관합니다.
+- 요청이 토큰 만료로 실패하면 재발급(`/auth/refresh`)을 **한 번만** 부르고, 원래 요청을 다시 보냅니다. 동시에 여러 요청이 실패해도 재발급은 한 번입니다.
+- 앱을 새로 켜면 시작화면이 떠 있는 동안 같은 재발급으로 로그인을 복구합니다.
+- 로그아웃하거나 세션이 만료되면 지역 뽑기 결과 같은 사용자별 상태를 함께 비웁니다.
+
+### 서버 밖 서비스
+
+| 서비스 | 쓰는 곳 | 하는 일 |
+|---|---|---|
+| 카카오 | 백엔드 | 로그인 확인, 식당 검색(로컬), 길찾기(자동차는 모빌리티, 도보·대중교통은 카카오맵 경로) |
+| 카카오 | 앱 | 지도 JavaScript SDK(웹뷰), 로그인 페이지(웹뷰) |
+| 한국관광공사 TourAPI | 백엔드 · 앱 | 관광지·음식점 정보는 DB에 미리 적재, 관광지 사진은 앱이 https로 바꿔 직접 표시 |
+| Google Gemini | AI 서버 | 코스 소개, 지역 맞춤 문장, 한 줄 소개 초안 |
+
+### 앱이 직접 다루는 것
+
+- **여행기 사진**: 서버를 거쳐 올라가고(EXIF 제거), 볼 때는 서버가 준 **5분짜리 서명 URL**로 S3에서 바로 받습니다.
+- **위치**: 코스 화면의 "지금 위치에서 거리 보기"를 누를 때만 묻습니다. 좌표는 요청 query로만 보내고 저장하거나 화면에 보여 주지 않습니다.
+- **공유 링크**: 안내 페이지가 앱(`tripin://`)을 엽니다. 앱이 없으면 코스·여행기는 웹페이지로 바로 보여 주고, 초대·친구 링크는 앱 받기로 보냅니다.
+
+### 배포
+
+- **앱**: `main` 푸시 → GitHub Actions가 테스트 후 릴리스 APK를 빌드합니다. OIDC 역할로 S3 `download/tripin.apk`에 올리고 CloudFront 캐시를 비웁니다([배포](#배포)).
+- **백엔드·AI 서버·정적 사이트**: [infra](https://github.com/yeso-please/infra) 저장소의 배포 워크플로가 맡습니다. 백엔드·AI 서버는 SSM Run Command로 EC2에, 정적 사이트는 S3에 올립니다.
 
 ## 개발 시작하기
 
