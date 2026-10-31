@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { StyleSheet, View } from "react-native";
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from "react-native-reanimated";
 
-import type { Course, CourseItem, Transport } from "@/api/types";
+import type { Course, CourseDay, CourseItem, MealItem, Transport } from "@/api/types";
 import { AppText, PressableScale } from "@/components/ui";
 import { colors, motion, radius, space } from "@/theme";
 
@@ -37,6 +37,9 @@ type Props = {
     onOpenMap: (dayIndex: number) => void;
     /** 그 날 코스에 새 장소 넣기 (지도 관광지 핀 7-3 → 5-3 ADD) */
     onAddPlace?: (dayIndex: number) => void;
+    /** 뺀 점심·저녁 다시 넣기 (5-3 ADD_MEAL) · 넣는 중인 끼니 */
+    onAddMeal?: (dayIndex: number, meal: MealItem["meal"], position?: number) => void;
+    addingMeal?: MealItem["meal"] | null;
   };
   /** 관광지 상세 시트 열기 (7-4는 회원 전용이라 공유·비회원 화면에서는 넘기지 않습니다) */
   onOpenDetail?: (attractionId: number) => void;
@@ -147,6 +150,8 @@ export function CourseBody({ course, transport, tab, onTabChange, dayIndex, onDa
             </PressableScale>
           ) : null}
 
+          {edit?.onAddMeal && tab === "all" ? <MissingMeals day={day} onAdd={edit.onAddMeal} adding={edit.addingMeal ?? null} /> : null}
+
           {tab === "changes" && removed.length > 0 ? (
             <Animated.View entering={FadeInDown} style={styles.removed}>
               {removed.map((r) => (
@@ -176,7 +181,44 @@ export function CourseBody({ course, transport, tab, onTabChange, dayIndex, onDa
   );
 }
 
+const MEALS: { meal: MealItem["meal"]; label: string }[] = [
+  { meal: "LUNCH", label: "점심" },
+  { meal: "DINNER", label: "저녁" },
+];
+
+/**
+ * 그날 빠진 끼니를 다시 넣는 버튼 (요청서 #7). 서버는 뺀 식사를 기록하지 않아 그날 항목에 meal이 있는지로 판단합니다.
+ * 점심은 그날 관광지 절반 뒤, 저녁은 맨 끝에 넣습니다 (나중에 순서 바꾸기로 옮길 수 있음).
+ */
+function MissingMeals({ day, onAdd, adding }: { day: CourseDay; onAdd: (dayIndex: number, meal: MealItem["meal"], position?: number) => void; adding: MealItem["meal"] | null }) {
+  const missing = MEALS.filter(({ meal }) => !day.items.some((i) => i.type === "MEAL" && i.meal === meal));
+  if (missing.length === 0) return null;
+  const attractionIndexes = day.items.flatMap((item, index) => (item.type === "ATTRACTION" ? [index] : []));
+  const half = Math.ceil(attractionIndexes.length / 2);
+  const lunchPosition = half > 0 ? attractionIndexes[half - 1] + 1 : 0;
+  return (
+    <View style={styles.missingMeals}>
+      {missing.map(({ meal, label }) => (
+        <PressableScale
+          key={meal}
+          onPress={() => onAdd(day.dayIndex, meal, meal === "LUNCH" ? lunchPosition : undefined)}
+          disabled={adding !== null}
+          style={styles.mealRestore}
+          accessibilityRole="button"
+          accessibilityLabel={`${day.dayIndex + 1}일차 ${label} 다시 넣기`}
+        >
+          <AppText variant="small13Medium" color="blue">
+            {adding === meal ? `${label} 넣는 중…` : `${label} 다시 넣기`}
+          </AppText>
+        </PressableScale>
+      ))}
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  missingMeals: { flexDirection: "row", justifyContent: "center", gap: space[8], marginTop: space[8] },
+  mealRestore: { paddingHorizontal: space[16], height: 36, justifyContent: "center", borderRadius: radius.md, backgroundColor: colors.surface },
   addPlace: {
     height: 44,
     marginTop: space[8],

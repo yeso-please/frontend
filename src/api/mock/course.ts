@@ -422,7 +422,12 @@ export function applyOperations(trip: CourseTrip, original: MockCourse, operatio
       }
       case "REMOVE": {
         const { dayIndex, index, item } = findItem(course, op.itemId);
-        if (item.type !== "ATTRACTION") throw invalidOp("식사는 지울 수 없어요.");
+        if (item.type === "MEAL") {
+          // 식사는 칸과 고른 식당을 함께 지우고 제외 기록에 남기지 않습니다. note는 받지 않습니다.
+          if (op.note !== undefined) throw invalidOp("식사를 뺄 때는 사유를 적지 않아요.");
+          course.days[dayIndex].splice(index, 1);
+          break;
+        }
         const note = checkNote(op.note);
         const a = findAttraction(item.attractionId);
         course.days[dayIndex].splice(index, 1);
@@ -469,6 +474,15 @@ export function applyOperations(trip: CourseTrip, original: MockCourse, operatio
         const { item } = findItem(course, op.itemId);
         if (item.type !== "MEAL") throw invalidOp("식당은 식사에만 고를 수 있어요.");
         item.restaurant = null;
+        break;
+      }
+      case "ADD_MEAL": {
+        const dayIndex = checkDay(course, op.dayIndex);
+        if (op.meal !== "LUNCH" && op.meal !== "DINNER") throw invalidOp("끼니는 LUNCH·DINNER예요.");
+        const items = course.days[dayIndex];
+        if (items.some((i) => i.type === "MEAL" && i.meal === op.meal)) throw invalidOp("이미 있는 끼니예요.");
+        const position = checkPosition(op.position, items.length);
+        items.splice(position, 0, { itemId: `m-${++course.seq}`, type: "MEAL", meal: op.meal, restaurant: null });
         break;
       }
       default:
@@ -522,6 +536,8 @@ export function restaurantRecommendations(trip: CourseTrip, course: MockCourse, 
     .map((r) => ({ ...r, distanceMeters: distanceMeters(origin, r), selectionToken: issueSelectionToken(trip.id, item.itemId, r) }))
     .filter((r) => r.distanceMeters <= radius)
     .sort((a, b) => a.distanceMeters - b.distanceMeters)
+    // 서버처럼 추천 이유를 최대 2개 붙입니다 (동선·출처 근거만, 맛·평점 표현 없음)
+    .map((r, i) => ({ ...r, reasons: [...(i < 2 ? [`앞 장소에서 ${r.distanceMeters < 1000 ? `${r.distanceMeters}m` : `${(r.distanceMeters / 1000).toFixed(1)}km`} 거리예요`] : []), "한국관광공사에 등록된 음식점이에요"] }))
     .slice(0, 20);
   return {
     itemId: item.itemId,

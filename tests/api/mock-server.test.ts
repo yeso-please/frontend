@@ -443,7 +443,8 @@ describe("코스 편집 (5-3)·대체 후보 (5-4)·식당 (5-5)", () => {
     expect(unchanged.json.version).toBe(course.version);
     expect(unchanged.json.changes!.removed).toEqual([]);
 
-    expect((await call("PATCH", `/courses/${trip.id}/schedule`, { version: course.version, operations: [{ op: "REMOVE", itemId: lunch.itemId }] }, token)).json.code).toBe("COURSE_INVALID_OPERATION");
+    // 식사는 뺄 수 있지만(요청서 #7) 사유(note)는 받지 않습니다
+    expect((await call("PATCH", `/courses/${trip.id}/schedule`, { version: course.version, operations: [{ op: "REMOVE", itemId: lunch.itemId, note: "따로 먹어요" }] }, token)).json.code).toBe("COURSE_INVALID_OPERATION");
     expect((await call("PATCH", `/courses/${trip.id}/schedule`, { version: course.version, operations: [{ op: "REMOVE", itemId: "a-999" }] }, token)).json.code).toBe("COURSE_ITEM_NOT_FOUND");
     expect((await call("PATCH", `/courses/${trip.id}/schedule`, { version: course.version, operations: [] }, token)).json.code).toBe("COURSE_INVALID_OPERATION");
 
@@ -479,6 +480,36 @@ describe("코스 편집 (5-3)·대체 후보 (5-4)·식당 (5-5)", () => {
     const cleared = await call<Course>("PATCH", `/courses/${trip.id}/schedule`, { version: set.json.version, operations: [{ op: "CLEAR_RESTAURANT", itemId: lunch.itemId }] }, token);
     expect(cleared.json.days[0].items.find((i) => i.itemId === lunch.itemId)).toMatchObject({ restaurant: null, travelFromPrevious: null });
     expect((await call("GET", `/courses/${trip.id}/restaurants/recommendations?itemId=${attractions(course)[0].itemId}`, undefined, token)).json.code).toBe("COURSE_INVALID_OPERATION");
+  });
+
+  it("식당 추천은 이유를 최대 2개 줍니다 (5-5 reasons)", async () => {
+    const { token } = await onboarded();
+    const { trip, course } = await tripWithCourse(token);
+    const lunch = course.days[0].items.find((i) => i.type === "MEAL")!;
+    const { json: recs } = await call<RestaurantRecommendations>("GET", `/courses/${trip.id}/restaurants/recommendations?itemId=${lunch.itemId}&radius=20000`, undefined, token);
+    for (const item of recs.sections[0].items) {
+      expect(item.reasons?.length).toBeGreaterThan(0);
+      expect(item.reasons!.length).toBeLessThanOrEqual(2);
+    }
+  });
+
+  it("점심을 빼면(REMOVE 식사) 칸이 사라지고 제외 기록엔 남지 않으며, ADD_MEAL로 다시 넣고 같은 끼니 중복은 400", async () => {
+    const { token } = await onboarded();
+    const { trip, course } = await tripWithCourse(token);
+    const lunch = course.days[0].items.find((i) => i.type === "MEAL" && i.meal === "LUNCH")!;
+
+    const withNote = await call("PATCH", `/courses/${trip.id}/schedule`, { version: course.version, operations: [{ op: "REMOVE", itemId: lunch.itemId, note: "따로 먹어요" }] }, token);
+    expect(withNote.json.code).toBe("COURSE_INVALID_OPERATION");
+
+    const removed = await call<Course>("PATCH", `/courses/${trip.id}/schedule`, { version: course.version, operations: [{ op: "REMOVE", itemId: lunch.itemId }] }, token);
+    expect(removed.json.days[0].items.some((i) => i.type === "MEAL" && i.meal === "LUNCH")).toBe(false);
+    expect(removed.json.changes?.removed ?? []).toHaveLength(0);
+
+    const added = await call<Course>("PATCH", `/courses/${trip.id}/schedule`, { version: removed.json.version, operations: [{ op: "ADD_MEAL", dayIndex: 0, meal: "LUNCH", position: 1 }] }, token);
+    expect(added.json.days[0].items[1]).toMatchObject({ type: "MEAL", meal: "LUNCH", restaurant: null });
+
+    const dup = await call("PATCH", `/courses/${trip.id}/schedule`, { version: added.json.version, operations: [{ op: "ADD_MEAL", dayIndex: 0, meal: "LUNCH" }] }, token);
+    expect(dup.json.code).toBe("COURSE_INVALID_OPERATION");
   });
 });
 

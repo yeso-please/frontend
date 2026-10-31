@@ -450,10 +450,13 @@ export type ScheduleOperation =
   | { op: "ADD"; dayIndex: number; position?: number; attractionId: number }
   | { op: "REPLACE"; itemId: string; attractionId: number; note?: string }
   | { op: "MOVE"; itemId: string; dayIndex: number; position: number }
+  /** 관광지는 제외 기록(changes.removed)에 남고, 식사(m-…)는 식사 칸·식당을 함께 지웁니다(식사에 note를 보내면 400) */
   | { op: "REMOVE"; itemId: string; note?: string }
   | { op: "RESTORE"; removalId: number; dayIndex?: number; position?: number }
   | { op: "SET_RESTAURANT"; itemId: string; selectionToken: string }
-  | { op: "CLEAR_RESTAURANT"; itemId: string };
+  | { op: "CLEAR_RESTAURANT"; itemId: string }
+  /** 뺀 점심·저녁을 다시 넣습니다 (날마다 끼니별 하나). position 생략 = 그날 맨 뒤, 식당은 미정 */
+  | { op: "ADD_MEAL"; dayIndex: number; meal: MealItem["meal"]; position?: number };
 export type AlternativeItem = {
   attractionId: number;
   name: string;
@@ -470,7 +473,8 @@ export type Alternatives = {
   groups: { category: AttractionCategory; label: string; items: AlternativeItem[] }[];
 };
 export type RestaurantOrigin = { type: "PREVIOUS_ATTRACTION" | "REGION_CENTER"; attractionId?: number | null; lat: number; lng: number };
-export type RestaurantCandidate = RestaurantSnapshot & { selectionToken: string; distanceMeters: number };
+/** reasons: 5-5 추천만 최대 2개 ("다음 장소 가는 길이에요 · 200m만 돌아가요"). 5-6 카카오 검색에는 없습니다 */
+export type RestaurantCandidate = RestaurantSnapshot & { selectionToken: string; distanceMeters: number; reasons?: string[] };
 export type RestaurantRecommendations = {
   itemId: string;
   origin: RestaurantOrigin;

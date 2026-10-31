@@ -9,6 +9,7 @@ import { toast } from "sonner-native";
 import { regionApi, tripApi } from "@/api/endpoints";
 import { errorMessage, isApiError } from "@/api/errors";
 import { queryKeys } from "@/api/queryKeys";
+import type { MealItem } from "@/api/types";
 import { Icons } from "@/components/icons";
 import { AppText, BottomCTA, Button, EmptyView, ErrorView, LoadingView, PressableScale, Screen, TopBar } from "@/components/ui";
 import { AttractionDetailSheet } from "@/features/place/components/AttractionDetailSheet";
@@ -67,6 +68,7 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
   const [status, setStatus] = useState<string | null>(null);
   const statusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [restoringId, setRestoringId] = useState<number | null>(null);
+  const [addingMeal, setAddingMeal] = useState<MealItem["meal"] | null>(null);
   const [confirmRegenerate, setConfirmRegenerate] = useState(false);
 
   const scrollRef = useAnimatedRef<Animated.ScrollView>();
@@ -154,6 +156,21 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
         if (!isApiError(e, "TRIP_VERSION_CONFLICT")) toast(errorMessage(e));
       },
       onSettled: () => setRestoringId(null),
+    });
+  };
+
+  /** 뺀 점심·저녁 다시 넣기 (5-3 ADD_MEAL) — 식당은 미정으로 들어와 '식당 고르기'에서 정합니다 */
+  const onAddMeal = (toDay: number, meal: MealItem["meal"], position?: number) => {
+    setAddingMeal(meal);
+    edit.mutate([{ op: "ADD_MEAL", dayIndex: toDay, meal, ...(position != null ? { position } : {}) }], {
+      onSuccess: () => {
+        haptics.confirm();
+        flash(`✓ ${meal === "LUNCH" ? "점심" : "저녁"}을 다시 넣었어요 · 식당은 '식당 고르기'에서 정해요`);
+      },
+      onError: (e) => {
+        if (!isApiError(e, "TRIP_VERSION_CONFLICT")) toast(errorMessage(e));
+      },
+      onSettled: () => setAddingMeal(null),
     });
   };
 
@@ -312,6 +329,8 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
                     restoringId,
                     onOpenMap: (d) => router.push({ pathname: "/trip/[tripId]/map", params: { tripId: String(tripId), dayIndex: String(d) } }),
                     onAddPlace: (d) => router.push({ pathname: "/trip/[tripId]/add", params: { tripId: String(tripId), dayIndex: String(d) } }),
+                    onAddMeal,
+                    addingMeal,
                   }
                 : undefined
             }

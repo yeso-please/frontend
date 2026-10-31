@@ -18,7 +18,7 @@ type Props = {
   onLayoutY?: (y: number) => void;
 };
 
-/** 식당 후보 행 — 원천이 준 정보(분류·거리·주소·근거·대표 메뉴)만 보여 주고 맛·평점 문구는 만들지 않습니다 */
+/** 식당 후보 행 — 원천이 준 정보(분류·거리·주소·추천 이유·근거·대표 메뉴)만 보여 주고 맛·평점 문구는 만들지 않습니다 */
 export function RestaurantRow({ item, number, selected, onPress, onLayoutY }: Props) {
   const meta = [restaurantCategoryLabel(item.category), formatDistance(item.distanceMeters)].filter(Boolean).join(" · ");
   const address = item.roadAddress ?? item.address;
@@ -52,6 +52,16 @@ export function RestaurantRow({ item, number, selected, onPress, onLayoutY }: Pr
             ) : null}
           </View>
         </View>
+        {/* 추천 이유(5-5, 최대 2개) — 서버가 동선·종류로 만든 문장 그대로 */}
+        {item.reasons && item.reasons.length > 0 ? (
+          <View style={styles.reasons}>
+            {item.reasons.slice(0, 2).map((reason) => (
+              <AppText key={reason} variant="small12" color="muted">
+                {`· ${reason}`}
+              </AppText>
+            ))}
+          </View>
+        ) : null}
         {item.representativeMenu ? <AppText variant="small13">{`대표 메뉴 · ${item.representativeMenu}`}</AppText> : null}
         <View style={styles.footer}>
           <View style={styles.labels}>
@@ -88,6 +98,7 @@ export function RestaurantRow({ item, number, selected, onPress, onLayoutY }: Pr
 }
 
 const styles = StyleSheet.create({
+  reasons: { gap: 2 },
   card: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.lg, padding: space[16], gap: space[8], backgroundColor: colors.white },
   selected: { borderColor: colors.blue, borderWidth: 1.5, backgroundColor: colors.paleblue },
   top: { flexDirection: "row", gap: space[12], alignItems: "center" },

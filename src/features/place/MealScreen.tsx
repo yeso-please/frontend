@@ -16,7 +16,7 @@ import { useCourse, useCourseEdit } from "@/features/course/useCourse";
 import { KakaoMapView, type MapMarker } from "@/features/kakaoMap";
 import { kakaoMapLink } from "@/features/kakaoMap/links";
 import { haptics } from "@/lib/haptics";
-import { withEunNeun, withEuro } from "@/lib/josa";
+import { withEulReul, withEunNeun, withEuro } from "@/lib/josa";
 import { colors, motion, radius, screenPadding, space } from "@/theme";
 
 import { RestaurantRow } from "./components/RestaurantRow";
@@ -87,6 +87,7 @@ export function MealScreen({ tripId, itemId }: { tripId: number; itemId: string 
 
   const [selected, setSelected] = useState<RestaurantCandidate | null>(null);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [confirmDrop, setConfirmDrop] = useState(false);
   const [mapTouching, setMapTouching] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const rows = useScrollToRow(scrollRef);
@@ -152,6 +153,24 @@ export function MealScreen({ tripId, itemId }: { tripId: number; itemId: string 
       onError: (e) => {
         setConfirmClear(false);
         if (!isApiError(e, "TRIP_VERSION_CONFLICT")) toast.error(errorMessage(e));
+      },
+    });
+  };
+
+  /** 이 날 이 끼니를 코스에서 뺍니다 (5-3 REMOVE 식사). 코스 화면 그날 목록 아래 "다시 넣기"로 돌아옵니다. */
+  const dropMeal = () => {
+    if (!meal) return;
+    const name = mealLabel(meal.meal);
+    edit.mutate([{ op: "REMOVE", itemId }], {
+      onSuccess: () => {
+        setConfirmDrop(false);
+        haptics.confirm();
+        toast.success(`${name}을 코스에서 뺐어요`, { description: "코스 화면 그날 목록 아래에서 다시 넣을 수 있어요" });
+        router.back();
+      },
+      onError: (e) => {
+        setConfirmDrop(false);
+        if (!isApiError(e, "TRIP_VERSION_CONFLICT")) toast.error(isApiError(e, "TRIP_ENDED") ? "끝난 여행의 코스는 바꿀 수 없어요" : errorMessage(e));
       },
     });
   };
@@ -331,11 +350,11 @@ export function MealScreen({ tripId, itemId }: { tripId: number; itemId: string 
           </View>
         </ScrollView>
 
-        <BottomCTA>
+        <BottomCTA helper={`이 날 ${label} 빼기`} onHelperPress={() => setConfirmDrop(true)}>
           <Button
             label={selected ? `${withEuro(selected.name)} 정하기` : "식당을 골라 주세요"}
             disabled={!selected || edit.isPending}
-            loading={edit.isPending && !confirmClear}
+            loading={edit.isPending && !confirmClear && !confirmDrop}
             onPress={choose}
           />
         </BottomCTA>
@@ -351,6 +370,17 @@ export function MealScreen({ tripId, itemId }: { tripId: number; itemId: string 
         loading={edit.isPending}
         onConfirm={clear}
         onCancel={() => setConfirmClear(false)}
+      />
+      <ConfirmDialog
+        visible={confirmDrop}
+        title={`코스에서 ${withEulReul(label)} 뺄까요?`}
+        body="고른 식당도 함께 빠져요. 나중에 코스 화면에서 다시 넣을 수 있어요."
+        confirmLabel={`${label} 빼기`}
+        cancelLabel="그대로 둘게요"
+        destructive
+        loading={edit.isPending}
+        onConfirm={dropMeal}
+        onCancel={() => setConfirmDrop(false)}
       />
     </Screen>
   );
