@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { Image } from "expo-image";
 import { Pressable, StyleSheet, useWindowDimensions, View } from "react-native";
 import Animated, { Extrapolation, interpolate, type SharedValue, useAnimatedStyle } from "react-native-reanimated";
 
@@ -6,6 +7,7 @@ import { regionApi } from "@/api/endpoints";
 import { queryKeys } from "@/api/queryKeys";
 import { Icons } from "@/components/icons";
 import { AppText, Button, Tag } from "@/components/ui";
+import { secureImageUrl } from "@/lib/imageUrl";
 import { colors, radius, screenPadding, shadows, space } from "@/theme";
 
 import { SHEET } from "../lib/geometry";
@@ -26,6 +28,8 @@ type Props = {
 };
 
 const hashTag = (tag: string) => (tag.startsWith("#") ? tag : `#${tag}`);
+/** 지역 대표 사진 썸네일 (요청서 #5) */
+const PHOTO = 80;
 
 /** "강릉 알아보기"가 버튼에 다 들어가지 않으면(긴 구 이름·좁은 화면) 짧은 문구로 바꿉니다. */
 const REDRAW_WIDTH = 92;
@@ -56,6 +60,9 @@ export function DestinationSheet({ progress, region, personaLine, onRedraw, onEx
   const data = card.data;
   const tagline = data?.tagline?.trim() || null;
   const tags = (data?.tags ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 4);
+  // 대표 사진: 받는 중에는 자리만 잡아 카드 높이가 흔들리지 않게, 사진이 없는 지역은 자리를 없앱니다.
+  const photo = secureImageUrl(data?.heroImage?.url);
+  const credit = data?.heroImage?.sourceName ?? null;
 
   return (
     <Animated.View style={[styles.sheet, sheetStyle]} pointerEvents="box-none" accessibilityViewIsModal={false}>
@@ -64,53 +71,69 @@ export function DestinationSheet({ progress, region, personaLine, onRedraw, onEx
         <View style={styles.handle} />
       </View>
       <View style={styles.body}>
-        <AppText variant="caption" color="darkgreen">
-          이번 여행지는
-        </AppText>
-        <AppText variant="title" numberOfLines={1} accessibilityRole="header">
-          {region.name}
-        </AppText>
+        <View style={styles.bodyText}>
+          <AppText variant="caption" color="darkgreen">
+            이번 여행지는
+          </AppText>
+          <AppText variant="title" numberOfLines={1} accessibilityRole="header">
+            {region.name}
+          </AppText>
 
-        {card.isPending ? (
-          <View style={styles.summary} accessibilityLabel="지역 소개를 불러오는 중이에요">
-            <ShimmerBlock width={220} height={16} />
-            <View style={styles.tags}>
-              <ShimmerBlock width={56} height={28} radius={radius.md} />
-              <ShimmerBlock width={56} height={28} radius={radius.md} />
-              <ShimmerBlock width={68} height={28} radius={radius.md} />
-            </View>
-          </View>
-        ) : card.isError ? (
-          <View style={styles.summary}>
-            <AppText variant="body" color="muted" numberOfLines={1}>
-              {region.province} {region.city}
-            </AppText>
-            <View style={styles.noteRow}>
-              <AppText variant="caption" color="muted">
-                소개를 불러오지 못했어요
-              </AppText>
-              <Pressable onPress={() => card.refetch()} hitSlop={12} accessibilityRole="button" accessibilityLabel="지역 소개 다시 불러오기">
-                <AppText variant="caption" color="blue">
-                  다시 불러오기
-                </AppText>
-              </Pressable>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.summary}>
-            {/* 소개가 승인 전이면 비어 있습니다 — 지어내지 않고 지역 이름을 보여 줍니다 */}
-            <AppText variant="body" color="muted" numberOfLines={2}>
-              {tagline ?? `${region.province} ${region.city}`}
-            </AppText>
-            {tags.length > 0 ? (
+          {card.isPending ? (
+            <View style={styles.summary} accessibilityLabel="지역 소개를 불러오는 중이에요">
+              <ShimmerBlock width={220} height={16} />
               <View style={styles.tags}>
-                {tags.map((tag) => (
-                  <Tag key={tag} label={hashTag(tag)} />
-                ))}
+                <ShimmerBlock width={56} height={28} radius={radius.md} />
+                <ShimmerBlock width={56} height={28} radius={radius.md} />
+                <ShimmerBlock width={68} height={28} radius={radius.md} />
               </View>
+            </View>
+          ) : card.isError ? (
+            <View style={styles.summary}>
+              <AppText variant="body" color="muted" numberOfLines={1}>
+                {region.province} {region.city}
+              </AppText>
+              <View style={styles.noteRow}>
+                <AppText variant="caption" color="muted">
+                  소개를 불러오지 못했어요
+                </AppText>
+                <Pressable onPress={() => card.refetch()} hitSlop={12} accessibilityRole="button" accessibilityLabel="지역 소개 다시 불러오기">
+                  <AppText variant="caption" color="blue">
+                    다시 불러오기
+                  </AppText>
+                </Pressable>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.summary}>
+              {/* 소개가 승인 전이면 비어 있습니다 — 지어내지 않고 지역 이름을 보여 줍니다 */}
+              <AppText variant="body" color="muted" numberOfLines={2}>
+                {tagline ?? `${region.province} ${region.city}`}
+              </AppText>
+              {tags.length > 0 ? (
+                <View style={styles.tags}>
+                  {tags.map((tag) => (
+                    <Tag key={tag} label={hashTag(tag)} />
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          )}
+        </View>
+        {card.isPending ? (
+          <View style={styles.photoBox}>
+            <ShimmerBlock width={PHOTO} height={PHOTO} radius={radius.md} />
+          </View>
+        ) : photo ? (
+          <View style={styles.photoBox}>
+            <Image source={{ uri: photo }} style={styles.photo} contentFit="cover" transition={200} accessibilityLabel={`${region.name} 대표 사진`} />
+            {credit ? (
+              <AppText variant="badge" color="muted" numberOfLines={1} style={styles.credit}>
+                {`사진 ${credit}`}
+              </AppText>
             ) : null}
           </View>
-        )}
+        ) : null}
       </View>
 
       <View style={styles.footer}>
@@ -155,7 +178,12 @@ const styles = StyleSheet.create({
   },
   handleArea: { height: 24, paddingTop: space[8], alignItems: "center", justifyContent: "center" },
   handle: { width: 36, height: 4, borderRadius: radius.xs, backgroundColor: colors.border },
-  body: { paddingTop: space[4], paddingHorizontal: screenPadding, gap: 2 },
+  // 왼쪽 글(이름·소개·태그), 오른쪽 대표 사진 — 카드 높이는 그대로입니다.
+  body: { flexDirection: "row", alignItems: "flex-start", gap: space[12], paddingTop: space[4], paddingHorizontal: screenPadding },
+  bodyText: { flex: 1, gap: 2 },
+  photoBox: { width: PHOTO, gap: 2, marginTop: space[8] },
+  photo: { width: PHOTO, height: PHOTO, borderRadius: radius.md, backgroundColor: colors.surface },
+  credit: { fontSize: 9, lineHeight: 12 },
   summary: { gap: space[8], marginTop: 2 },
   tags: { flexDirection: "row", gap: space[8], height: 28, overflow: "hidden" },
   noteRow: { minHeight: 28, flexDirection: "row", alignItems: "center", gap: space[8] },
