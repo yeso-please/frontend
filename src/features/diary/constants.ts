@@ -5,6 +5,9 @@ export const EXPERIENCE_TAGS = ["자연", "바다", "산", "산책", "골목", "
 export const MAX_EXPERIENCE_TAGS = 5;
 export const MAX_PHOTOS = 30;
 export const MAX_PHOTO_BYTES = 10 * 1024 * 1024;
+/** 서버는 한 요청에 100MB까지 받습니다(6-2, backend #121). 여유를 두고 90MB·10장씩 나눠 차례로 올립니다. */
+export const UPLOAD_BATCH_BYTES = 90 * 1024 * 1024;
+export const UPLOAD_BATCH_FILES = 10;
 export const TITLE_MAX = 60;
 export const BODY_MAX = 5000;
 

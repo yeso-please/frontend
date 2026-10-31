@@ -37,7 +37,7 @@ import {
   VISIBILITY_OPTIONS,
 } from "../constants";
 import { useDiary, useInvalidateDiaries, useMyTravelMap } from "../hooks";
-import { diffForm, type Form, formOf } from "../lib";
+import { diffForm, type Form, formOf, uploadBatches } from "../lib";
 
 const ALLOWED = new Set(["image/jpeg", "image/png", "image/webp"]);
 const GRID_GAP = 5;
@@ -116,8 +116,11 @@ function DiaryEditor({ diary }: { diary: Diary }) {
     },
   });
 
+  // 고른 사진을 묶음(90MB·10장)으로 나눠 차례로 올립니다. 서버는 한 요청에 100MB까지 받습니다.
   const upload = useMutation({
-    mutationFn: (files: UploadFile[]) => diaryApi.uploadPhotos(diary.diaryId, files),
+    mutationFn: async (files: (UploadFile & { size: number })[]) => {
+      for (const batch of uploadBatches(files)) await diaryApi.uploadPhotos(diary.diaryId, batch);
+    },
     onSuccess: async () => {
       haptics.confirm();
       await queryClient.invalidateQueries({ queryKey: key });
@@ -125,6 +128,8 @@ function DiaryEditor({ diary }: { diary: Diary }) {
     },
     onError: (e) => {
       haptics.reject();
+      // 앞 묶음은 이미 올라갔을 수 있으니 목록을 다시 받습니다.
+      void queryClient.invalidateQueries({ queryKey: key });
       if (isApiError(e, "DIARY_PHOTO_LIMIT_EXCEEDED")) toast(`사진은 여행기마다 ${MAX_PHOTOS}장까지 올릴 수 있어요`);
       else if (isApiError(e, "DIARY_PHOTO_INVALID")) toast("올릴 수 없는 사진이 있어요. JPEG·PNG·WebP, 10MB 이하만 돼요");
       else if (isApiError(e, "DIARY_PHOTO_STORAGE_UNAVAILABLE")) toast("지금은 사진을 올릴 수 없어요. 잠시 후 다시 시도해 주세요");
@@ -148,9 +153,9 @@ function DiaryEditor({ diary }: { diary: Diary }) {
   const remaining = MAX_PHOTOS - diary.photos.length;
   const uploadAssets = (assets: ImagePicker.ImagePickerAsset[]) => {
     const picked = assets.slice(0, remaining);
-    const files: UploadFile[] = picked
+    const files = picked
       .filter((a) => (a.fileSize ?? 0) <= MAX_PHOTO_BYTES && ALLOWED.has(a.mimeType ?? "image/jpeg"))
-      .map((a, i) => ({ uri: a.uri, name: a.fileName ?? `photo-${Date.now()}-${i}.jpg`, type: a.mimeType ?? "image/jpeg" }));
+      .map((a, i) => ({ uri: a.uri, name: a.fileName ?? `photo-${Date.now()}-${i}.jpg`, type: a.mimeType ?? "image/jpeg", size: a.fileSize ?? 0 }));
     if (files.length < picked.length) toast(`${picked.length - files.length}장은 형식이나 크기(10MB) 때문에 뺐어요`);
     if (files.length > 0) upload.mutate(files);
   };

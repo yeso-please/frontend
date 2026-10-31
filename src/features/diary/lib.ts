@@ -1,6 +1,8 @@
 import type { Diary, DiaryUpdate, DiaryVisibility, LocationPrecision, TravelMapPin } from "@/api/types";
 import { projectToMap } from "@/lib/mapProjection";
 
+import { UPLOAD_BATCH_BYTES, UPLOAD_BATCH_FILES } from "./constants";
+
 // 여행기 화면의 순수 계산 (테스트: tests/features/diary.test.ts)
 
 export const PIN = 52;
@@ -62,3 +64,23 @@ export function diffForm(before: Form, after: Form): DiaryUpdate {
   return patch;
 }
 
+/**
+ * 사진을 한 요청에 다 싣지 않고, 묶음마다 합계 maxBytes·maxFiles를 넘지 않게 고른 순서대로 나눕니다.
+ * 한 장이 maxBytes보다 크면(장당 한도 안이라도) 그 장만 따로 한 묶음이 됩니다.
+ */
+export function uploadBatches<T extends { size: number }>(files: T[], maxBytes = UPLOAD_BATCH_BYTES, maxFiles = UPLOAD_BATCH_FILES): T[][] {
+  const batches: T[][] = [];
+  let current: T[] = [];
+  let bytes = 0;
+  for (const file of files) {
+    if (current.length > 0 && (bytes + file.size > maxBytes || current.length >= maxFiles)) {
+      batches.push(current);
+      current = [];
+      bytes = 0;
+    }
+    current.push(file);
+    bytes += file.size;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
