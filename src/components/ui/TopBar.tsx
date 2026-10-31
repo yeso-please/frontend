@@ -29,9 +29,12 @@ export function TopBar({ title, right, onBack, showBack = true }: Props) {
           </PressableScale>
         )}
       </View>
-      <AppText variant="label" numberOfLines={1} style={styles.title}>
-        {title}
-      </AppText>
+      {/* 타이틀은 양옆 너비와 상관없이 가운데에 둡니다 (오른쪽에 "임시저장" 같은 글자가 와도 줄바꿈되지 않게) */}
+      <View style={styles.titleWrap} pointerEvents="none">
+        <AppText variant="label" numberOfLines={1} style={styles.title}>
+          {title}
+        </AppText>
+      </View>
       <View style={[styles.side, styles.right]}>{right}</View>
     </View>
   );
@@ -45,8 +48,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: screenPadding - 14,
     backgroundColor: colors.white,
   },
-  side: { width: 56, justifyContent: "center" },
-  right: { alignItems: "flex-end", paddingRight: 14 },
+  side: { minWidth: 56, justifyContent: "center" },
+  right: { marginLeft: "auto", alignItems: "flex-end", paddingRight: 14 },
   back: { width: sizes.touchTarget, height: sizes.touchTarget, alignItems: "center", justifyContent: "center" },
-  title: { flex: 1, textAlign: "center" },
+  titleWrap: { ...StyleSheet.absoluteFill, justifyContent: "center", paddingHorizontal: 72 },
+  title: { textAlign: "center" },
 });
