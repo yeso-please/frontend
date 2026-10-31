@@ -17,6 +17,11 @@ describe("여행 준비 단계 (frontend-guide 준비 단계 계산)", () => {
     expect(prepStep({ ...base, hasCourse: true })).toBe("done");
   });
 
+  it("다녀온 여행 기록은 초대할 수 없어 초대 단계를 건너뜁니다", () => {
+    expect(prepStep({ ...base, retroactive: true })).toBe("course");
+    expect(prepStep({ ...base, retroactive: true, hasCourse: true })).toBe("done");
+  });
+
   it("칩 문구와 이어서 준비하기 경로", () => {
     expect(PREP_STEP_LABEL.course).toBe("코스 만드는 중");
     expect(prepStepHref(7, "invite")).toEqual({ pathname: "/trip/[tripId]/invite", params: { tripId: "7" } });

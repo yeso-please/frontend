@@ -13,8 +13,9 @@ import type { MealItem } from "@/api/types";
 import { Icons } from "@/components/icons";
 import { AppText, BottomCTA, Button, EmptyView, ErrorView, LoadingView, PressableScale, Screen, TopBar } from "@/components/ui";
 import { AttractionDetailSheet } from "@/features/place/components/AttractionDetailSheet";
+import { useStartDiary } from "@/features/diary/hooks";
 import { CourseShareSheet } from "@/features/share/CourseShareSheet";
-import { diffDays } from "@/lib/date";
+import { diffDays, todayYmd } from "@/lib/date";
 import { haptics } from "@/lib/haptics";
 import { shortRegionName, withEuro } from "@/lib/josa";
 import { useAuthStore } from "@/store/auth";
@@ -59,6 +60,7 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
   const regionCard = useQuery({ queryKey: queryKeys.regionCard(regionSigCd ?? ""), queryFn: () => regionApi.card(regionSigCd!), enabled: noCourse && !!regionSigCd });
 
   const generate = useGenerateCourse(tripId);
+  const startDiary = useStartDiary();
   const edit = useCourseEdit(tripId);
   const watchers = usePresence(tripId, !!context.data);
 
@@ -243,12 +245,17 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
     toast("여행 준비를 마쳤어요", { description: "코스는 여행 전까지 언제든 고칠 수 있어요." });
     router.dismissTo("/(tabs)");
   };
+  // 끝난 여행(다녀온 여행 기록 포함)은 여행기로 이어집니다.
+  const ended = !!context.data && context.data.endDate < todayYmd();
   let cta: { label: string; onPress: () => void; loading?: boolean; disabled?: boolean } | null = null;
   /** 혼자인 여행을 다시 열었을 때 작은 "친구 초대하기" 링크 (참여자 화면에는 초대 입구가 없습니다) */
   let inviteLink = false;
   if (!data) {
     if (!regionSigCd) cta = { label: "랜덤으로 여행지 정하기", onPress: () => pickRegion.mutate(), loading: pickRegion.isPending };
     else if (canGenerate) cta = { label: generate.isPending ? "코스를 만드는 중이에요" : "첫 코스 만들기", onPress: () => runGenerate(), loading: generate.isPending };
+  } else if (ended) {
+    // 끝난 여행(다녀온 여행 기록 포함)은 여행기로 이어집니다. 이미 쓴 여행기가 있으면 그 여행기를 엽니다 (6-1).
+    cta = { label: "여행기 쓰기", onPress: () => startDiary.mutate(tripId), loading: startDiary.isPending };
   } else if (preparing) {
     // 3/4에서 넘어왔으면 친구 초대로 되돌려 보내지 않습니다 (혼자 가기·초대 후 응답 대기 모두).
     // 변경 수에는 내가 직접 바꾼 것도 들어가므로 변경이 있어도 준비를 끝맺습니다 (변경은 '변경 표시' 탭에서 봄).
@@ -350,7 +357,11 @@ export function CourseScreen({ tripId, fromPrep = false }: { tripId: number; fro
       </Animated.ScrollView>
 
       {cta ? (
-        <BottomCTA>
+        <BottomCTA
+          // 다녀온 여행인데 코스가 없으면 코스를 만들지 않고 바로 여행기를 쓸 수도 있습니다 (6-1: 코스 없이도 생성)
+          helper={ended && !data && regionSigCd ? "코스 없이 바로 여행기 쓰기" : undefined}
+          onHelperPress={ended && !data && regionSigCd ? () => startDiary.mutate(tripId) : undefined}
+        >
           <Button label={cta.label} onPress={cta.onPress} loading={cta.loading} disabled={cta.disabled} rightIcon={cta.loading ? undefined : <Icons.ArrowRight width={20} height={20} />} />
         </BottomCTA>
       ) : inviteLink ? (

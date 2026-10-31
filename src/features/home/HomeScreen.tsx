@@ -50,6 +50,7 @@ export function HomeScreen() {
       participantCount: t.participants.length,
       sentInviteCount: sentCount.get(t.tripId) ?? 0,
       hasCourse: t.hasCourse,
+      retroactive: t.retroactive,
     });
 
   const refresh = async () => {

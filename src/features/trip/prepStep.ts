@@ -10,10 +10,13 @@ export type PrepInput = {
   /** 이 여행에서 보낸 친구 초대 수 (상태 무관, 4-14). 모르면 0 */
   sentInviteCount: number;
   hasCourse: boolean;
+  /** 다녀온 여행 기록(사후 기록 여행)은 초대할 수 없어 초대 단계를 건너뜁니다 */
+  retroactive?: boolean;
 };
 
-export function prepStep({ regionSigCd, participantCount, sentInviteCount, hasCourse }: PrepInput): PrepStep {
+export function prepStep({ regionSigCd, participantCount, sentInviteCount, hasCourse, retroactive = false }: PrepInput): PrepStep {
   if (!regionSigCd) return "region";
+  if (retroactive) return hasCourse ? "done" : "course";
   // "혼자 여행할게요"로 넘어가 코스까지 만든 여행은 초대 단계를 지난 것으로 봅니다 (안 그러면 혼자 가는 여행이 계속 "친구 초대 중").
   if (participantCount < 2 && sentInviteCount === 0 && !hasCourse) return "invite";
   if (!hasCourse) return "course";

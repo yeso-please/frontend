@@ -27,6 +27,8 @@ import { colors, motion, screenPadding, space } from "@/theme";
 
 /** 앞으로 몇 달까지 넘겨 볼 수 있는지 */
 const MONTHS_AHEAD = 12;
+/** 다녀온 여행을 기록할 때 돌아갈 수 있는 달 수 */
+const MONTHS_BACK = 24;
 
 type Notice = { title: string; lines?: string[]; redraw?: boolean };
 
@@ -43,12 +45,14 @@ export default function TripDatesScreen() {
   const limit = useRegionDayLimit(maxNights == null ? region?.sigCd : null);
 
   const today = todayYmd();
-  const minMonth = monthIdOf(today);
-  const maxMonth = shiftMonth(minMonth, MONTHS_AHEAD);
+  const thisMonth = monthIdOf(today);
+  // 다녀온 여행도 기록할 수 있게 지난 달로도 넘어갑니다 (3-3: 시작일은 과거도 허용)
+  const minMonth = shiftMonth(thisMonth, -MONTHS_BACK);
+  const maxMonth = shiftMonth(thisMonth, MONTHS_AHEAD);
 
   const [start, setStart] = useState<string | null>(null);
   const [end, setEnd] = useState<string | null>(null);
-  const [month, setMonth] = useState(minMonth);
+  const [month, setMonth] = useState(thisMonth);
   const [direction, setDirection] = useState<-1 | 0 | 1>(0);
   const [submitting, setSubmitting] = useState(false);
   const [conflicts, setConflicts] = useState<TripConflict[]>([]);
@@ -97,7 +101,6 @@ export default function TripDatesScreen() {
   };
 
   const statusOf = (ymd: string): DayStatus => {
-    if (ymd < today) return "past";
     if (blocked.has(ymd)) return "blocked";
     if (start && !end && ymd >= start && rangeProblem(start, ymd)) return "overLimit";
     return "available";
@@ -116,7 +119,6 @@ export default function TripDatesScreen() {
 
   // ── 날짜 누르기: 시작일 → 종료일 (같은 날을 한 번 더 = 당일) ──
   const onDayPress = (ymd: string) => {
-    if (ymd < today) return;
     if (blocked.has(ymd)) return reject("이미 다른 여행이 있는 날이에요");
     setConflicts([]);
     setNotice(null);
@@ -133,6 +135,8 @@ export default function TripDatesScreen() {
   };
 
   const rangeIssue = start && end ? rangeProblem(start, end) : null;
+  // 종료일이 오늘 이전이면 사후 기록 여행(retroactive): 친구 초대 없이 코스를 정리하고 바로 여행기를 씁니다.
+  const pastTrip = !!end && end < today;
   const canSubmit = !!start && !!end && !submitting && !rangeIssue && !limitChecking && !regionBlockedEntirely;
   const visibleHasBlocked = [...blocked].some((d) => d.startsWith(month.slice(0, 7)));
 
@@ -171,7 +175,9 @@ export default function TripDatesScreen() {
       // 그 지역으로 여행을 만들었으니 여행 탭은 처음 지도로 돌아갑니다.
       useDiscoverDraw.getState().clear();
       haptics.confirm();
-      router.replace({ pathname: "/trip/[tripId]/invite", params: { tripId: String(trip.id) } });
+      // 지난 여행은 초대할 수 없어(4-1·4-6 TRIP_ENDED) 3/4를 건너뛰고 코스 화면으로 갑니다.
+      if (trip.retroactive) router.replace({ pathname: "/trip/[tripId]", params: { tripId: String(trip.id), prep: "solo" } });
+      else router.replace({ pathname: "/trip/[tripId]/invite", params: { tripId: String(trip.id) } });
     } catch (e) {
       haptics.reject();
       if (isApiError(e, "TRIP_DATE_OVERLAP")) {
@@ -205,7 +211,7 @@ export default function TripDatesScreen() {
             언제 떠날까요?
           </AppText>
           <AppText variant="body" color="muted">
-            {"여행 날짜를 정하면 가능한 일정에 맞춰\n코스를 만들어요."}
+            {"여행 날짜를 정하면 가능한 일정에 맞춰\n코스를 만들어요. 다녀온 여행은 지난 날짜로 기록해요."}
           </AppText>
         </Animated.View>
 
@@ -227,6 +233,14 @@ export default function TripDatesScreen() {
 
         <Animated.View layout={LinearTransition.springify().damping(motion.spring.gentle.damping)} entering={FadeInDown.delay(2 * motion.stagger).springify()} style={styles.after}>
           <DateRangeSummary start={start} end={end} />
+
+          {pastTrip && !rangeIssue ? (
+            <InlineNotice
+              tone="neutral"
+              title="다녀온 여행으로 기록해요"
+              lines={["친구 초대 없이 혼자 기록하는 여행이에요.", "다녀온 코스를 정리한 뒤 바로 여행기를 쓸 수 있어요."]}
+            />
+          ) : null}
 
           {conflicts.length > 0 ? (
             <InlineNotice title="이 기간에 이미 다른 여행이 있어요" lines={conflicts.map((c) => `${c.title} (${formatRange(c.startDate, c.endDate)})`)} />
@@ -292,7 +306,15 @@ export default function TripDatesScreen() {
           onPress={() => void handleSubmit()}
           loading={submitting}
           disabled={!canSubmit}
-          accessibilityHint={!start || !end ? "시작일과 종료일을 먼저 골라 주세요" : limitChecking ? "코스를 만들 수 있는 기간을 확인하고 있어요" : "여행을 만들고 친구 초대로 넘어가요"}
+          accessibilityHint={
+            !start || !end
+              ? "시작일과 종료일을 먼저 골라 주세요"
+              : limitChecking
+                ? "코스를 만들 수 있는 기간을 확인하고 있어요"
+                : pastTrip
+                  ? "다녀온 여행으로 만들고 코스 화면으로 넘어가요"
+                  : "여행을 만들고 친구 초대로 넘어가요"
+          }
         />
       </BottomCTA>
     </Screen>
